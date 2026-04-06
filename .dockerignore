@@ -1,0 +1,6 @@
+docs/**
+.vscode/**
+.vagrant/**
+Vagrantfile
+
+refs/**

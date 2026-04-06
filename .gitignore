@@ -31,3 +31,7 @@ go.work
 
 # Internal Markdown ( I save it for references )
 *.ref.md
+
+# VsCode
+.vscode/**
+!.vscode/extensions.json

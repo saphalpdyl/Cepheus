@@ -1,0 +1,47 @@
+name: retail
+
+topology:
+  defaults:
+    kind: linux
+
+  nodes:
+    core-switch-01:
+      image: quay.io/frrouting/frr:10.5.1
+
+    core-switch-02:
+      image: quay.io/frrouting/frr:10.5.1
+
+    access-switch-01:
+      image: cepheus-as:latest
+
+    access-switch-02:
+      image: cepheus-as:latest
+
+    security-appliance:
+      image: cepheus-probe-agent:latest
+      env:
+        MODE: reflector
+
+    ap1:
+      image: cepheus-probe-agent:latest
+      env:
+        MODE: active
+
+  links:
+    # AP → AS-01
+    - endpoints: ["ap1:eth1", "access-switch-01:eth1"]
+
+    # AS-01 → both core switches
+    - endpoints: ["access-switch-01:eth2", "core-switch-01:eth1"]
+    - endpoints: ["access-switch-01:eth3", "core-switch-02:eth1"]
+
+    # AS-02 → both core switches
+    - endpoints: ["access-switch-02:eth1", "core-switch-01:eth2"]
+    - endpoints: ["access-switch-02:eth2", "core-switch-02:eth2"]
+
+    # inter-switch link CS-01 ↔ CS-02
+    - endpoints: ["core-switch-01:eth3", "core-switch-02:eth3"]
+
+    # both core switches → SA
+    - endpoints: ["core-switch-01:eth4", "security-appliance:eth1"]
+    - endpoints: ["core-switch-02:eth4", "security-appliance:eth2"]
