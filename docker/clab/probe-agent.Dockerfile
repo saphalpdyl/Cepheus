@@ -18,7 +18,8 @@ RUN apk add --no-cache \
     iputils \
     mtr \
     traceroute \
-    busybox-extras
+    busybox-extras \
+    iptables
 
 COPY --from=build /bin/probe-agent /usr/local/bin/probe-agent
 COPY docker/clab/entrypoint-sa.sh /usr/local/bin/entrypoint-sa.sh

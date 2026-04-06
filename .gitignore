@@ -35,3 +35,12 @@ go.work
 # VsCode
 .vscode/**
 !.vscode/extensions.json
+
+# Claude
+.claude/**
+
+# Builds
+**/dist/**
+
+# Web
+.next/**

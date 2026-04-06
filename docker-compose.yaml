@@ -1,0 +1,13 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg17
+    container_name: cepheus-timescaledb
+    environment:
+      - POSTGRES_PASSWORD=admin
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    ports: 
+      - 5432:5432
+
+volumes:
+  timescale_data:
