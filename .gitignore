@@ -28,3 +28,6 @@ go.work
 .env
 .env.*
 !.env.example
+
+# Internal Markdown ( I save it for references )
+*.ref.md

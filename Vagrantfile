@@ -7,6 +7,8 @@ Vagrant.configure("2") do |config|
     lv.cpus = 4
   end
   
+  config.vm.provision "shell", path: "./scripts/dev/install-deps.sh"
   config.vm.provision "shell", path: "./scripts/dev/install-docker.sh"
   config.vm.provision "shell", path: "./scripts/dev/install-containerlab.sh"
+  
 end
