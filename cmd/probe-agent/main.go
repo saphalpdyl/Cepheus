@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"cepheus/internal/probe"
 )
@@ -23,4 +25,10 @@ func main() {
 	}
 
 	fmt.Printf("probe-agent starting in %s mode\n", cfg.Mode)
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
+
+	fmt.Println("probe-agent shutting down")
 }

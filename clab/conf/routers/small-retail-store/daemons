@@ -1,3 +1,0 @@
-# /etc/frr/daemons
-zebra=yes
-bgpd=yes

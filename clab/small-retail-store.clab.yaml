@@ -7,20 +7,42 @@ topology:
   nodes:
     core-switch-01:
       image: quay.io/frrouting/frr:10.5.1
+      binds:
+        - conf/routers/small-retail-store/core-switch-01/frr.conf:/etc/frr/frr.conf
+        - conf/routers/small-retail-store/core-switch-01/daemons:/etc/frr/daemons
 
     core-switch-02:
       image: quay.io/frrouting/frr:10.5.1
+      binds:
+        - conf/routers/small-retail-store/core-switch-02/frr.conf:/etc/frr/frr.conf
+        - conf/routers/small-retail-store/core-switch-02/daemons:/etc/frr/daemons
 
     access-switch-01:
-      image: cepheus-as:latest
+      image: alpine:3.21
+      exec:
+        - apk add --no-cache bridge-utils
+        - brctl addbr br0
+        - brctl stp br0 on
+        - brctl addif br0 eth1 eth2 eth3
+        - ip link set br0 up
 
     access-switch-02:
-      image: cepheus-as:latest
+      image: alpine:3.21
+      exec:
+        - apk add --no-cache bridge-utils
+        - brctl addbr br0
+        - brctl stp br0 on
+        - brctl addif br0 eth1 eth2
+        - ip link set br0 up
 
     security-appliance:
-      image: cepheus-probe-agent:latest
+      image: cepheus-sa:latest
+      binds:
+        - conf/routers/small-retail-store/security-appliance/frr.conf:/etc/frr/frr.conf
+        - conf/routers/small-retail-store/security-appliance/daemons:/etc/frr/daemons
       env:
         MODE: reflector
+      cmd: entrypoint-sa.sh
 
     ap1:
       image: cepheus-probe-agent:latest

@@ -18,4 +18,5 @@ apt-get install -y \
     mtr-tiny \
     jq \
     gnupg \
-    lsb-release
+    lsb-release \
+    make
