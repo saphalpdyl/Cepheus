@@ -2,5 +2,5 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-# Containerlab
-curl -sL https://containerlab.dev/setup | bash -s "all"
+source /tmp/version.env
+bash -c "$(curl -sL https://get.containerlab.dev)" -- -v $CONTAINERLAB_VERSION
