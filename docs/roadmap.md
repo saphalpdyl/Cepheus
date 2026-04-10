@@ -1,4 +1,4 @@
-## Initial plan ( might not make it to the end ) 
+## Initial plan
 
 - Basic Paris/Dublin traceroute based hop information gathering 
 - TWAMP/STAMP reflectors at ==3 different geographical regions 
@@ -10,3 +10,6 @@
     - backend ( control plane for configuration, probe agent on/off on every cepheus-agent based node )
     - frontend (next.js)
 - Time series based database setup
+
+### Architectural decisions
+- Cepheus-agent sits inside the managed network and on different regions. It will use the `cepheus-stamp` library to act both as `Session-Sender` & `Session-Reflector` as defined in RFC 8762
