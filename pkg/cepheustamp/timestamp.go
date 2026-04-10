@@ -5,8 +5,11 @@ import (
 	"time"
 )
 
+// NtpUnixOffset is the number of seconds between the NTP epoch (1900-01-01)
+// and the Unix epoch (1970-01-01).
 const NtpUnixOffset = 2208988800
 
+// TimestampClockFormat identifies the clock format used in a Timestamp.
 type TimestampClockFormat string
 
 const (
@@ -22,12 +25,14 @@ type Timestamp struct {
 	Fraction uint32
 }
 
+// TimestampParams configures timestamp generation.
 type TimestampParams struct {
 	ClockFormat TimestampClockFormat
 }
 
-// Generate current timestamp with specified clock format
-func Now(p TimestampParams) (*Timestamp, error) {
+// NewTimestamp returns a Timestamp captured at the current time using the
+// clock format specified in p.
+func NewTimestamp(p TimestampParams) (*Timestamp, error) {
 	now := time.Now()
 
 	if p.ClockFormat == ClockFormatNTP {
@@ -51,6 +56,7 @@ func generateNtpTimestamp(t time.Time) Timestamp {
 	}
 }
 
+// FromTime converts a time.Time into a Timestamp using the specified clock format.
 func FromTime(p TimestampParams, t time.Time) (*Timestamp, error) {
 	if p.ClockFormat == ClockFormatNTP {
 		timestamp := generateNtpTimestamp(t)

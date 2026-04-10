@@ -6,12 +6,17 @@ import (
 	"fmt"
 )
 
+// SenderPacket is an unauthenticated STAMP sender test packet (RFC 8762 §3.2).
+// The wire format is 44 octets: sequence number, timestamp, error estimate,
+// and 30 octets of MBZ (must be zero) padding.
 type SenderPacket struct {
 	SequenceNumber uint32
 	Timestamp      Timestamp
 	ErrorEstimate  uint16
 }
 
+// Encode serializes the SenderPacket into a 44-octet buffer.
+// hmacKey must be nil; authenticated mode is not yet supported.
 func (p *SenderPacket) Encode(hmacKey []byte) ([]byte, error) {
 	if hmacKey != nil {
 		// Auth mode not supported
@@ -28,6 +33,8 @@ func (p *SenderPacket) Encode(hmacKey []byte) ([]byte, error) {
 	return buf, nil
 }
 
+// DecodeSenderPacket parses a 44-octet buffer into a SenderPacket.
+// hmacKey must be nil; authenticated mode is not yet supported.
 func DecodeSenderPacket(hmacKey []byte, b []byte) (*SenderPacket, error) {
 	if hmacKey != nil {
 		// Auth mode not supported
@@ -50,6 +57,9 @@ func DecodeSenderPacket(hmacKey []byte, b []byte) (*SenderPacket, error) {
 	return p, nil
 }
 
+// ReflectorPacket is an unauthenticated STAMP reflector response packet
+// (RFC 8762 §4.2). It echoes the sender's fields and adds the reflector's
+// own timestamps, totalling 44 octets on the wire.
 type ReflectorPacket struct {
 	SequenceNumber       uint32
 	Timestamp            Timestamp
@@ -61,6 +71,8 @@ type ReflectorPacket struct {
 	SenderTTL            uint8
 }
 
+// Encode serializes the ReflectorPacket into a 44-octet buffer.
+// hmacKey must be nil; authenticated mode is not yet supported.
 func (p *ReflectorPacket) Encode(hmacKey []byte) ([]byte, error) {
 	if hmacKey != nil {
 		// Auth mode not supported
@@ -92,6 +104,8 @@ func (p *ReflectorPacket) Encode(hmacKey []byte) ([]byte, error) {
 	return buf, nil
 }
 
+// DecodeReflectorPacket parses a 44-octet buffer into a ReflectorPacket.
+// hmacKey must be nil; authenticated mode is not yet supported.
 func DecodeReflectorPacket(hmacKey []byte, data []byte) (*ReflectorPacket, error) {
 	if hmacKey != nil {
 		// Auth mode not supported
