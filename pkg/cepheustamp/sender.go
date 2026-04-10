@@ -1,6 +1,8 @@
 package cepheustamp
 
-import "net"
+import (
+	"net"
+)
 
 // Packet format for unauth mode ( RFC 8762 )
 //     0                   1                   2                   3
@@ -22,31 +24,57 @@ import "net"
 //    |                                                               |
 //    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
+type SenderConfig struct {
+	LocalAddr  string
+	RemoteAddr string
+	HMACKey    *[]byte
+}
+
 // Sender originates STAMP test packets and matches reflected replies against
 // outstanding sequence numbers.
 type Sender struct {
-	conn *net.UDPConn
+	Conn    *net.UDPConn
+	HMACKey *[]byte
+	seq     uint32
 }
 
-func NewSender(local, remote *net.UDPAddr) (*Sender, error) {
-	panic("not implemented")
+func (s *Sender) NewSender(config SenderConfig) (*Sender, error) {
+	localAddr, err := net.ResolveUDPAddr("udp", config.LocalAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteAddr, err := net.ResolveUDPAddr("udp", config.RemoteAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := net.DialUDP("udp", localAddr, remoteAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Sender{
+		Conn:    conn,
+		HMACKey: config.HMACKey,
+		seq:     0,
+	}, nil
 }
 
 // Send transmits a single test packet and returns the sequence number used.
 func (s *Sender) Send() (uint32, error) {
-	panic("not implemented")
-}
+	if s.HMACKey == nil {
+		// Authenticated mode; not supported
+		panic("not implemented")
+	}
 
-// Receive blocks until a reflected packet arrives or the underlying
-// connection is closed.
-func (s *Sender) Receive() (*Packet, error) {
-	panic("not implemented")
+	return s.seq, nil
 }
 
 // Close releases the underlying socket.
 func (s *Sender) Close() error {
-	if s.conn == nil {
+	if s.Conn == nil {
 		return nil
 	}
-	return s.conn.Close()
+	return s.Conn.Close()
 }

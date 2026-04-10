@@ -1,14 +1,59 @@
 package cepheustamp
 
-// Packet represents a STAMP test packet (unauthenticated mode).
-//
-// Field layout and semantics follow RFC 8762 §4.2.1.
-type Packet struct {
+import (
+	"encoding/binary"
+	"errors"
+	"fmt"
+)
+
+type SenderPacket struct {
 	SequenceNumber uint32
 	Timestamp      Timestamp
 	ErrorEstimate  uint16
+}
 
-	// Reflector-only fields (MBZ in ).
+func (p *SenderPacket) Encode(hmacKey []byte) ([]byte, error) {
+	if hmacKey != nil {
+		// Auth mode not supported
+		panic("not implemented")
+	}
+
+	buf := make([]byte, 44)
+
+	binary.BigEndian.PutUint32(buf[0:4], p.SequenceNumber)
+	binary.BigEndian.PutUint32(buf[4:8], p.Timestamp.Seconds)
+	binary.BigEndian.PutUint32(buf[8:12], p.Timestamp.Fraction)
+	binary.BigEndian.PutUint16(buf[12:14], p.ErrorEstimate)
+
+	return buf, nil
+}
+
+func DecodeSenderPacket(hmacKey []byte, b []byte) (*SenderPacket, error) {
+	if hmacKey != nil {
+		// Auth mode not supported
+		panic("not implemented")
+	}
+
+	if len(b) < 44 {
+		return nil, errors.New("packet too short")
+	}
+
+	p := &SenderPacket{
+		SequenceNumber: binary.BigEndian.Uint32(b[0:4]),
+		Timestamp: Timestamp{
+			Seconds:  binary.BigEndian.Uint32(b[4:8]),
+			Fraction: binary.BigEndian.Uint32(b[8:12]),
+		},
+		ErrorEstimate: binary.BigEndian.Uint16(b[12:14]),
+	}
+
+	return p, nil
+}
+
+type ReflectorPacket struct {
+	SequenceNumber       uint32
+	Timestamp            Timestamp
+	ErrorEstimate        uint16
 	ReceiveTimestamp     Timestamp
 	SenderSequenceNumber uint32
 	SenderTimestamp      Timestamp
@@ -16,10 +61,69 @@ type Packet struct {
 	SenderTTL            uint8
 }
 
-func Encode(p *Packet) ([]byte, error) {
-	panic("not implemented")
+func (p *ReflectorPacket) Encode(hmacKey []byte) ([]byte, error) {
+	if hmacKey != nil {
+		// Auth mode not supported
+		panic("not implemented")
+	}
+
+	buf := make([]byte, 44)
+
+	binary.BigEndian.PutUint32(buf[0:4], p.SequenceNumber)
+	binary.BigEndian.PutUint32(buf[4:8], p.Timestamp.Seconds)
+	binary.BigEndian.PutUint32(buf[8:12], p.Timestamp.Fraction)
+	binary.BigEndian.PutUint16(buf[12:14], p.ErrorEstimate)
+
+	// 14-15: MBZ
+
+	binary.BigEndian.PutUint32(buf[16:20], p.ReceiveTimestamp.Seconds)
+	binary.BigEndian.PutUint32(buf[20:24], p.ReceiveTimestamp.Fraction)
+	binary.BigEndian.PutUint32(buf[24:28], p.SenderSequenceNumber)
+	binary.BigEndian.PutUint32(buf[28:32], p.SenderTimestamp.Seconds)
+	binary.BigEndian.PutUint32(buf[32:36], p.SenderTimestamp.Fraction)
+	binary.BigEndian.PutUint16(buf[36:38], p.SenderErrorEstimate)
+
+	// 38-39: MBZ
+
+	buf[40] = p.SenderTTL
+
+	// 41-43: MBZ
+
+	return buf, nil
 }
 
-func Decode(b []byte) (*Packet, error) {
-	panic("not implemented")
+func DecodeReflectorPacket(hmacKey []byte, data []byte) (*ReflectorPacket, error) {
+	if hmacKey != nil {
+		// Auth mode not supported
+		panic("not implemented")
+	}
+
+	if len(data) < 44 {
+		return nil, fmt.Errorf("packet too short: got %d bytes, need 44", len(data))
+	}
+
+	p := &ReflectorPacket{
+		SequenceNumber: binary.BigEndian.Uint32(data[0:4]),
+		Timestamp: Timestamp{
+			Seconds:  binary.BigEndian.Uint32(data[4:8]),
+			Fraction: binary.BigEndian.Uint32(data[8:12]),
+		},
+		ErrorEstimate: binary.BigEndian.Uint16(data[12:14]),
+		// 14-15: MBZ
+		ReceiveTimestamp: Timestamp{
+			Seconds:  binary.BigEndian.Uint32(data[16:20]),
+			Fraction: binary.BigEndian.Uint32(data[20:24]),
+		},
+		SenderSequenceNumber: binary.BigEndian.Uint32(data[24:28]),
+		SenderTimestamp: Timestamp{
+			Seconds:  binary.BigEndian.Uint32(data[28:32]),
+			Fraction: binary.BigEndian.Uint32(data[32:36]),
+		},
+		SenderErrorEstimate: binary.BigEndian.Uint16(data[36:38]),
+		// 38-39: MBZ
+		SenderTTL: data[40],
+		// 41-43: MBZ
+	}
+
+	return p, nil
 }
