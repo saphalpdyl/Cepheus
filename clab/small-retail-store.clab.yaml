@@ -38,42 +38,32 @@ topology:
       binds:
         - conf/routers/small-retail-store/security-appliance/frr.conf:/etc/frr/frr.conf
         - conf/routers/small-retail-store/security-appliance/daemons:/etc/frr/daemons
-      env:
-        MODE: reflector
-      entrypoint: /usr/local/bin/entrypoint-sa.sh
+        - ../dist/cepheus-agent:/opt/cepheus-agent
       exec:
         - ip addr add 192.168.121.100/24 dev eth3
         - ip link set eth3 up
         - sysctl -w net.ipv4.ip_forward=1
         - iptables -t nat -A POSTROUTING -o eth3 -j MASQUERADE
+        - sh -c '/opt/cepheus-agent/cepheus-agent /opt/cepheus-agent/cepheus-default.config.yaml &'
 
     ap1:
-      image: cepheus-probe-agent:latest
-      env:
-        MODE: active
+      image: alpine:3.21
+      binds:
+        - ../dist/cepheus-agent:/opt/cepheus-agent
       exec:
-       - ip addr add 10.0.1.2/30 dev eth1
-       - ip link set eth1 up
-       - ip route add default via 10.0.1.1
+        - ip addr add 10.0.1.2/30 dev eth1
+        - ip link set eth1 up
+        - ip route add default via 10.0.1.1
+        - sh -c '/opt/cepheus-agent/cepheus-agent /opt/cepheus-agent/cepheus-default.config.yaml &'
 
   links:
-    # AP → AS-01
     - endpoints: ["ap1:eth1", "access-switch-01:eth1"]
 
-    # AS-01 → CS-01
     - endpoints: ["access-switch-01:eth2", "core-switch-01:eth1"]
-
-    # AS-02 → CS-02
     - endpoints: ["access-switch-02:eth1", "core-switch-02:eth1"]
 
-    # inter-switch link CS-01 ↔ CS-02 (L3 iBGP peering)
     - endpoints: ["core-switch-01:eth2", "core-switch-02:eth2"]
-
-    # CS-01 → SA
     - endpoints: ["core-switch-01:eth3", "security-appliance:eth1"]
-
-    # CS-02 → SA
     - endpoints: ["core-switch-02:eth3", "security-appliance:eth2"]
 
-    # SA WAN uplink (macvlan on VM's eth0)
     - endpoints: ["security-appliance:eth3", "macvlan:eth0"]
