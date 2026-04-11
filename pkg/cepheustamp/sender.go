@@ -27,26 +27,30 @@ import (
 
 // SenderConfig holds the parameters needed to construct a Sender.
 type SenderConfig struct {
-	LocalAddr   string
-	RemoteAddr  string
-	HMACKey     *[]byte
-	ClockFormat TimestampClockFormat
-	Config      Config
+	LocalAddr  string
+	RemoteAddr string
+	HMACKey    []byte
+	OnError    func(error)
+	Config     Config
 }
 
 // Sender originates STAMP test packets and matches reflected replies against
 // outstanding sequence numbers.
 type Sender struct {
-	Conn        *net.UDPConn
-	HMACKey     *[]byte
-	seq         uint32
-	ClockFormat TimestampClockFormat
-	Config      Config
+	Conn    *net.UDPConn
+	HMACKey []byte
+	seq     uint32
+	onError func(error)
+	Config  Config
 }
 
 // NewSender resolves the local and remote UDP addresses from cfg, opens a
 // connected UDP socket, and returns a ready-to-use Sender.
-func (s *Sender) NewSender(cfg SenderConfig) (*Sender, error) {
+func NewSender(cfg SenderConfig) (*Sender, error) {
+	if cfg.Config.ErrorEstimate.ClockFormat != ClockFormatNTP {
+		return nil, errors.New("invalid clock format: valid options are NTP")
+	}
+
 	localAddr, err := net.ResolveUDPAddr("udp", cfg.LocalAddr)
 	if err != nil {
 		return nil, err
@@ -62,14 +66,11 @@ func (s *Sender) NewSender(cfg SenderConfig) (*Sender, error) {
 		return nil, err
 	}
 
-	if cfg.ClockFormat != ClockFormatNTP {
-		return nil, errors.New("Invalid clock format: valid options are NTP")
-	}
-
 	return &Sender{
 		Conn:    conn,
 		HMACKey: cfg.HMACKey,
 		seq:     0,
+		onError: cfg.OnError,
 		Config:  cfg.Config,
 	}, nil
 }
@@ -90,25 +91,22 @@ func (s *Sender) Send() (uint32, error) {
 	}
 
 	timestamp, err := NewTimestamp(TimestampParams{
-		ClockFormat: s.ClockFormat,
+		ClockFormat: s.Config.ErrorEstimate.ClockFormat,
 	})
-
 	if err != nil {
 		return 0, err
 	}
 
 	errorEstimate, err := NewErrorEstimate(
-		s.Config.ErrorEstimateSynchronized,
-		s.Config.ErrorEstimateClockFormat,
-		s.Config.ErrorEstimateScale,
-		s.Config.ErrorEstimateMultiplier,
+		s.Config.ErrorEstimate.Synchronized,
+		s.Config.ErrorEstimate.ClockFormat,
+		s.Config.ErrorEstimate.Scale,
+		s.Config.ErrorEstimate.Multiplier,
 	)
-
 	if err != nil {
 		return 0, err
 	}
 
-	// Create packet
 	senderPkt := SenderPacket{
 		SequenceNumber: s.seq,
 		Timestamp:      *timestamp,
@@ -116,13 +114,11 @@ func (s *Sender) Send() (uint32, error) {
 	}
 
 	buf, err := senderPkt.Encode(nil)
-
 	if err != nil {
 		return 0, err
 	}
 
 	_, err = s.Conn.Write(buf)
-
 	if err != nil {
 		return 0, err
 	}

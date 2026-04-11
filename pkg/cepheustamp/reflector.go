@@ -32,8 +32,9 @@ import (
 // the sender, populating the reflector-side fields.
 type ReflectorConfig struct {
 	LocalAddr string
-	Config    Config
+	HMACKey   []byte
 	OnError   func(error)
+	Config    Config
 }
 
 type Reflector struct {
@@ -76,7 +77,7 @@ func (r *Reflector) Serve() error {
 
 		// Capture receive timestamp as early as possible after reading.
 		rxTimestamp, err := NewTimestamp(TimestampParams{
-			ClockFormat: r.Config.ErrorEstimateClockFormat,
+			ClockFormat: r.Config.ErrorEstimate.ClockFormat,
 		})
 		if err != nil {
 			r.handleError(err)
@@ -95,10 +96,10 @@ func (r *Reflector) Serve() error {
 		}
 
 		errorEstimate, err := NewErrorEstimate(
-			r.Config.ErrorEstimateSynchronized,
-			r.Config.ErrorEstimateClockFormat,
-			r.Config.ErrorEstimateScale,
-			r.Config.ErrorEstimateMultiplier,
+			r.Config.ErrorEstimate.Synchronized,
+			r.Config.ErrorEstimate.ClockFormat,
+			r.Config.ErrorEstimate.Scale,
+			r.Config.ErrorEstimate.Multiplier,
 		)
 		if err != nil {
 			r.handleError(err)
@@ -106,7 +107,7 @@ func (r *Reflector) Serve() error {
 		}
 
 		timestamp, err := NewTimestamp(TimestampParams{
-			ClockFormat: r.Config.ErrorEstimateClockFormat,
+			ClockFormat: r.Config.ErrorEstimate.ClockFormat,
 		})
 		if err != nil {
 			r.handleError(err)
