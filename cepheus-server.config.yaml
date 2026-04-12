@@ -1,0 +1,2 @@
+# Default configuration for cepheus-server.config.yaml
+listen: ":8080"

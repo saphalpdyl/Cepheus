@@ -1,2 +1,3 @@
+# Default config for cepheus-agent
 control_plane: 
   url: 171.23.12.42

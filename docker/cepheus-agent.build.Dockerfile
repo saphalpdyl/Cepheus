@@ -13,4 +13,4 @@ RUN CGO_ENABLED=0 go build -o /bin/cepheus-agent ./cmd/cepheus-agent
 
 FROM scratch
 COPY --from=build /bin/cepheus-agent /cepheus-agent/cepheus-agent
-COPY cepheus-default.config.yaml /cepheus-agent/cepheus-default.config.yaml
+COPY cepheus-agent.config.yaml /cepheus-agent/cepheus-agent.config.yaml

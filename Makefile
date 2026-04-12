@@ -3,7 +3,7 @@
 
 build:
 	docker build --output type=local,dest=dist/ -f docker/cepheus-agent.build.Dockerfile .
-	docker build -t cepheus-sa:latest -f docker/clab/security-appliance.Dockerfile .
+	docker build -t cepheus-sa:latest -f docker/dev/clab/security-appliance.Dockerfile .
 
 clean:
 	-sudo containerlab destroy -t clab/small-retail-store.clab.yaml

@@ -16,7 +16,7 @@ type Config struct {
 }
 
 func main() {
-	cfgPath := "cepheus-default.config.yaml"
+	cfgPath := "cepheus-agent.config.yaml"
 	if len(os.Args) > 1 {
 		cfgPath = os.Args[1]
 	}
