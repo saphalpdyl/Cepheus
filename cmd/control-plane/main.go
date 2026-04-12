@@ -1,16 +1,21 @@
+// Control-plane = cepheus-server
+
 package main
 
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"cepheus/internal/common"
 	controlplane "cepheus/internal/control-plane"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,7 +45,19 @@ func main() {
 		cfg.Listen = ":8080"
 	}
 
-	srv := controlplane.NewServer(cfg.Listen, map[string]controlplane.AgentConfig{})
+	// Environment variables for database url
+	databaseUrl, err := common.TryGetFromEnv("CEPHEUS_DB_URL")
+	if err != nil {
+		os.Exit(1)
+	}
+
+	pool, err := pgxpool.New(context.Background(), databaseUrl)
+	if err != nil {
+		// TODO: Should retry instead of kill
+		log.Fatalf("failed to connect to the database %v", err)
+	}
+
+	srv := controlplane.NewServer(cfg.Listen, pool)
 
 	go func() {
 		sig := make(chan os.Signal, 1)

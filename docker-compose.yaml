@@ -5,15 +5,28 @@ services:
     environment:
       - POSTGRES_PASSWORD=admin
     volumes:
-      - timescale_data:/var/lib/postgresql/data
+      - ./db/setup.sql:/docker-entrypoint-initdb.d/01-setup.sql
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
     ports: 
-      - 5432:5432
+      - 5435:5432
   
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: cepheus-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - 5050:80
+    depends_on:
+      - db
+
   cepheus-server:
     image: cepheus-server:latest
     container_name: cepheus-server
     ports:
       - 8070:8080
-  
-volumes:
-  timescale_data:
+    environment:
+      - CEPHEUS_DB_URL=postgres://postgres:admin@db:5435/postgres?sslmode=disable
+    depends_on:
+      - db

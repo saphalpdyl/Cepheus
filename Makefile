@@ -1,8 +1,14 @@
-.PHONY: build dist ips apply
+.PHONY: build dist ips apply db dev build-vm
 
 # Host Related
 build:
 	docker build -t cepheus-server:latest -f docker/cepheus-server.Dockerfile .
+
+dev:
+	docker compose up --build cepheus-server
+
+db:
+	docker compose up --build pgadmin db
 
 # VM Related
 build-vm:

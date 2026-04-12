@@ -3,6 +3,9 @@ package controlplane
 import (
 	"context"
 	"net/http"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Server struct {
@@ -10,8 +13,11 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(listenAddr string, agents map[string]AgentConfig) *Server {
-	h := &Handler{agents: agents}
+func NewServer(listenAddr string, dbPool *pgxpool.Pool) *Server {
+	h := &Handler{
+		pool: dbPool,
+		conn: []*pgx.Conn{},
+	}
 
 	mux := http.NewServeMux()
 	v1 := http.NewServeMux()
