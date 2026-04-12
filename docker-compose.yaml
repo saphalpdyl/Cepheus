@@ -9,5 +9,11 @@ services:
     ports: 
       - 5432:5432
   
+  cepheus-server:
+    image: cepheus-server:latest
+    container_name: cepheus-server
+    ports:
+      - 8070:8080
+  
 volumes:
   timescale_data:

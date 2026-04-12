@@ -19,7 +19,7 @@ type Config struct {
 }
 
 func main() {
-	cfgPath := "controlplane.config.yaml"
+	cfgPath := "cepheus-server.config.yaml"
 	if len(os.Args) > 1 {
 		cfgPath = os.Args[1]
 	}

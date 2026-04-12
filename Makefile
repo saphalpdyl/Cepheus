@@ -1,7 +1,11 @@
 .PHONY: build dist ips apply
 
-
+# Host Related
 build:
+	docker build -t cepheus-server:latest -f docker/cepheus-server.Dockerfile .
+
+# VM Related
+build-vm:
 	docker build --output type=local,dest=dist/ -f docker/cepheus-agent.build.Dockerfile .
 	docker build -t cepheus-sa:latest -f docker/dev/clab/security-appliance.Dockerfile .
 
@@ -16,6 +20,6 @@ ips:
 	  printf "%-24s %-60s\n" "$$c" "$${ifaces:-<none>}"; \
 	done
 
-apply: clean build
+apply: clean build-vm
 	sudo clab deploy -t clab/small-retail-store.clab.yaml
 	$(MAKE) ips
