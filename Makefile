@@ -4,7 +4,7 @@
 build:
 	docker build -t cepheus-server:latest -f docker/cepheus-server.Dockerfile .
 
-dev:
+dev: build
 	docker compose up --build cepheus-server
 
 db:

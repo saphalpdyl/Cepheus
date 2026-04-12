@@ -1,24 +1,16 @@
 package controlplane
 
 import (
+	"cepheus/internal/common"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-type ProbeConfig struct {
-	Type   string         `json:"type" yaml:"type"`
-	Mode   string         `json:"mode" yaml:"mode"`
-	Params map[string]any `json:"params" yaml:"params"`
-}
-
-type AgentConfig struct {
-	Probes []ProbeConfig `json:"probes" yaml:"probes"`
-}
 
 type Handler struct {
 	pool *pgxpool.Pool
@@ -32,7 +24,8 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var config json.RawMessage
+	var config common.AgentConfig
+	fmt.Fprintf(os.Stdout, "Hello there")
 	err := h.pool.QueryRow(r.Context(),
 		"SELECT config FROM agent_config WHERE serial_id = $1",
 		serialID,
@@ -46,9 +39,7 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(config)
+	writeJSON(w, http.StatusOK, config)
 }
 
 func (h *Handler) PostAgentData(w http.ResponseWriter, r *http.Request) {

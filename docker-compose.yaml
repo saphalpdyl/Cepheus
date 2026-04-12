@@ -27,6 +27,6 @@ services:
     ports:
       - 8070:8080
     environment:
-      - CEPHEUS_DB_URL=postgres://postgres:admin@db:5435/postgres?sslmode=disable
+      - CEPHEUS_DB_URL=postgres://postgres:admin@db:5432/postgres?sslmode=disable
     depends_on:
       - db
