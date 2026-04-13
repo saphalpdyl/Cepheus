@@ -23,21 +23,62 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var config common.AgentConfig
-	err := h.pool.QueryRow(r.Context(),
-		"SELECT config FROM agent_config WHERE serial_id = $1",
+	rows, err := h.pool.Query(r.Context(),
+		`SELECT c.version, c.generation,
+		        c.report_endpoint, c.report_batch_size, c.report_interval_seconds,
+		        EXTRACT(EPOCH FROM c.created_at)::bigint,
+		        EXTRACT(EPOCH FROM c.updated_at)::bigint,
+		        t.task_id, t.type, t.enabled, t.params
+		 FROM device d
+		 JOIN agent_config c ON c.id = d.agent_config_id
+		 LEFT JOIN agent_task t ON t.agent_config_id = c.id
+		 WHERE d.serial_id = $1`,
 		serialID,
-	).Scan(&config)
+	)
 	if err != nil {
-		if err.Error() == "no rows in result set" {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", serialID))
-			return
-		}
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("query failed: %v", err))
 		return
 	}
+	defer rows.Close()
 
-	writeJSON(w, http.StatusOK, config)
+	var cfg common.AgentConfig
+	found := false
+	for rows.Next() {
+		var taskID *string
+		var taskType *common.AgentTaskType
+		var taskEnabled *bool
+		var taskParams *json.RawMessage
+
+		if err := rows.Scan(
+			&cfg.Version, &cfg.Generation,
+			&cfg.ReportEndpoint, &cfg.ReportBatchSize, &cfg.ReportIntervalSeconds,
+			&cfg.CreatedAt, &cfg.UpdatedAt,
+			&taskID, &taskType, &taskEnabled, &taskParams,
+		); err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("scan failed: %v", err))
+			return
+		}
+		found = true
+		if taskID != nil {
+			cfg.Tasks = append(cfg.Tasks, common.AgentTask{
+				TaskID:  *taskID,
+				Type:    *taskType,
+				Enabled: *taskEnabled,
+				Params:  *taskParams,
+			})
+		}
+	}
+
+	if !found {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", serialID))
+		return
+	}
+
+	if cfg.Tasks == nil {
+		cfg.Tasks = []common.AgentTask{}
+	}
+
+	writeJSON(w, http.StatusOK, cfg)
 }
 
 func (h *Handler) PostAgentData(w http.ResponseWriter, r *http.Request) {
