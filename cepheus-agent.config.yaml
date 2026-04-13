@@ -2,3 +2,6 @@
 control_plane: 
   url: http://192.168.121.1:8070
   config_endpoint: /api/v1/devices/config/
+telemetry:
+  sink: otel
+  otel_collector_url: http://192.168.121.1:4318

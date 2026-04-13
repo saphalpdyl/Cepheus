@@ -24,26 +24,8 @@ func log() *slog.Logger {
 	return slog.Default().With(logattr.Domain(logattr.DomainServerLifecycle))
 }
 
-type Config struct {
-	Listen string `yaml:"listen"`
-}
-
 func main() {
 	ctx := context.Background()
-
-	logShutdown, err := telemetry.SetupLogging(ctx, "stdout", "", "cepheus-server", "", false)
-	if err != nil {
-		slog.Error("failed to setup logging", "error", err)
-		os.Exit(1)
-	}
-	defer logShutdown(ctx)
-
-	traceShutdown, err := telemetry.SetupTracing(ctx, "stdout", "", "cepheus-server", "", false)
-	if err != nil {
-		slog.Error("failed to setup tracing", "error", err)
-		os.Exit(1)
-	}
-	defer traceShutdown(ctx)
 
 	cfgPath := "cepheus-server.config.yaml"
 	if len(os.Args) > 1 {
@@ -56,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var cfg Config
+	var cfg controlplane.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		log().Error("failed to parse config", "error", err)
 		os.Exit(1)
@@ -65,6 +47,24 @@ func main() {
 	if cfg.Listen == "" {
 		cfg.Listen = ":8080"
 	}
+
+	if cfg.Telemetry.Sink == "otel" && cfg.Telemetry.OTelCollectorURL == "" {
+		panic("sink == otel requires otel_collector_url to be non-empty")
+	}
+
+	logShutdown, err := telemetry.SetupLogging(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "cepheus-server", "", false)
+	if err != nil {
+		slog.Error("failed to setup logging", "error", err)
+		os.Exit(1)
+	}
+	defer logShutdown(ctx)
+
+	traceShutdown, err := telemetry.SetupTracing(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "cepheus-server", "", false)
+	if err != nil {
+		slog.Error("failed to setup tracing", "error", err)
+		os.Exit(1)
+	}
+	defer traceShutdown(ctx)
 
 	databaseUrl, err := common.TryGetFromEnv("CEPHEUS_DB_URL")
 	if err != nil {

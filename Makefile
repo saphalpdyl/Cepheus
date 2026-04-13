@@ -1,4 +1,4 @@
-.PHONY: build dist ips apply db dev build-vm
+.PHONY: build dist ips apply db dev build-vm telemetry
 
 # Host Related
 build:
@@ -9,6 +9,9 @@ dev: build
 
 db:
 	docker compose up --build pgadmin db
+
+telemetry:
+	docker compose up otel-collector grafana loki tempo
 
 # VM Related
 build-vm:

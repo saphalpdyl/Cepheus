@@ -30,3 +30,42 @@ services:
       - CEPHEUS_DB_URL=postgres://postgres:admin@db:5432/postgres?sslmode=disable
     depends_on:
       - db
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    volumes:
+      - ./telemetry/otel-collector.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus metrics exporter
+
+  tempo:
+    image: grafana/tempo:2.7.2
+    volumes:
+      - ./telemetry/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/var/tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+
+  loki:
+    image: grafana/loki:latest
+    volumes:
+      - ./telemetry/loki.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+
+volumes:
+  tempo-data:
+  loki-data:
+  grafana-data:

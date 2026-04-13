@@ -1,10 +1,7 @@
-package cepheusagent
+package controlplane
 
 type Config struct {
-	ControlPlane struct {
-		URL            string `yaml:"url"`
-		ConfigEndpoint string `yaml:"config_endpoint"`
-	} `yaml:"control_plane"`
+	Listen    string `yaml:"listen"`
 	Telemetry struct {
 		Sink             string `yaml:"sink"`
 		OTelCollectorURL string `yaml:"otel_collector_url"`

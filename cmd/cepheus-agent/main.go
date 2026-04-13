@@ -21,20 +21,6 @@ func log() *slog.Logger {
 func main() {
 	ctx := context.Background()
 
-	logShutdown, err := telemetry.SetupLogging(ctx, "stdout", "", "cepheus-agent", "", false)
-	if err != nil {
-		slog.Error("failed to setup logging", "error", err)
-		os.Exit(1)
-	}
-	defer logShutdown(ctx)
-
-	traceShutdown, err := telemetry.SetupTracing(ctx, "stdout", "", "cepheus-agent", "", false)
-	if err != nil {
-		slog.Error("failed to setup tracing", "error", err)
-		os.Exit(1)
-	}
-	defer traceShutdown(ctx)
-
 	serialID := ""
 	cfgPath := "cepheus-agent.config.yaml"
 	if len(os.Args) > 1 {
@@ -60,6 +46,24 @@ func main() {
 		log().Error("control_plane.url is required")
 		os.Exit(1)
 	}
+
+	if cfg.Telemetry.Sink == "otel" && cfg.Telemetry.OTelCollectorURL == "" {
+		panic("sink == otel requires otel_collector_url to be non-empty")
+	}
+
+	logShutdown, err := telemetry.SetupLogging(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "cepheus-agent", "", false)
+	if err != nil {
+		slog.Error("failed to setup logging", "error", err)
+		os.Exit(1)
+	}
+	defer logShutdown(ctx)
+
+	traceShutdown, err := telemetry.SetupTracing(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "cepheus-agent", "", false)
+	if err != nil {
+		slog.Error("failed to setup tracing", "error", err)
+		os.Exit(1)
+	}
+	defer traceShutdown(ctx)
 
 	log().Info("starting", "control_plane", cfg.ControlPlane.URL, "serial_id", serialID)
 
