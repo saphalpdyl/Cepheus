@@ -32,3 +32,13 @@ ips:
 apply: clean build-vm
 	sudo clab deploy -t clab/small-retail-store.clab.yaml
 	$(MAKE) ips
+
+
+# Tests
+test.build:
+	docker build -t test-stamp-suite:latest -f docker/tests/stamp.test.Dockerfile .
+
+test.integration: test.build
+	docker compose -f docker-compose.test.yaml up -d
+	go test -v -tags integration ./pkg/cepheusstamp/tests/integration
+	docker compose -f docker-compose.test.yaml down

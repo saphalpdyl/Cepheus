@@ -1,4 +1,4 @@
-package cepheustamp
+package cepheusstamp
 
 import (
 	"errors"
@@ -41,6 +41,23 @@ func NewTimestamp(p TimestampParams) (*Timestamp, error) {
 	}
 
 	return nil, errors.New("invalid clock format")
+}
+
+func (t *Timestamp) ToTime(clockFormat TimestampClockFormat) (*time.Time, error) {
+	if clockFormat == ClockFormatNTP {
+		time := wireNTPTimestampToTime(t.Seconds, t.Fraction)
+		return &time, nil
+	}
+
+	return nil, errors.New("invalid clock format")
+}
+
+func wireNTPTimestampToTime(sec, frac uint32) time.Time {
+	seconds := int64(sec) - NtpUnixOffset
+
+	// Reverse the fraction: (fraction * 10^9) / 2^32
+	nanos := int64((uint64(frac) * 1e9) >> 32)
+	return time.Unix(seconds, nanos)
 }
 
 func generateNtpTimestamp(t time.Time) Timestamp {

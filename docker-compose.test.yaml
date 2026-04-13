@@ -1,0 +1,7 @@
+services:
+  stamp-suite-reflector:
+    image: test-stamp-suite:latest
+    container_name: cepheus-test-reflector-stamp-suite
+    ports:
+      - "862:862/udp"
+    command: "./target/release/stamp-suite -i"
