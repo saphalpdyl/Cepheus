@@ -1,6 +1,8 @@
 package main
 
 import (
+	cepheusagent "cepheus/internal/cepheus-agent"
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,16 +11,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Config struct {
-	ControlPlane struct {
-		URL string `yaml:"url"`
-	} `yaml:"control_plane"`
-}
-
 func main() {
+	// The binary will be called as: cepheus-agent [serial-id] [config-file-path]
+	serialID := ""
 	cfgPath := "cepheus-agent.config.yaml"
 	if len(os.Args) > 1 {
-		cfgPath = os.Args[1]
+		serialID = os.Args[1]
+	}
+	if len(os.Args) > 2 {
+		cfgPath = os.Args[2]
 	}
 
 	data, err := os.ReadFile(cfgPath)
@@ -27,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var cfg Config
+	var cfg cepheusagent.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to parse config: %v\n", err)
 		os.Exit(1)
@@ -43,6 +44,13 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
+
+	agent := cepheusagent.NewAgent(cepheusagent.AgentConfig{
+		SerialId:           serialID,
+		LocalBufferSize:    100, // TODO: Make this configurable
+		ControlPlaneConfig: cfg,
+	})
+	agent.Run(context.Background())
 
 	fmt.Println("cepheus-agent shutting down")
 }
