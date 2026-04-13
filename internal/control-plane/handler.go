@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,7 +24,6 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var config common.AgentConfig
-	fmt.Fprintf(os.Stdout, "Hello there")
 	err := h.pool.QueryRow(r.Context(),
 		"SELECT config FROM agent_config WHERE serial_id = $1",
 		serialID,

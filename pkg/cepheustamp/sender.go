@@ -2,7 +2,9 @@ package cepheustamp
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"time"
 )
 
 // Packet format for unauth mode ( RFC 8762 )
@@ -31,6 +33,7 @@ type SenderConfig struct {
 	RemoteAddr string
 	HMACKey    []byte
 	OnError    func(error)
+	Timeout    time.Duration
 	Config     Config
 }
 
@@ -41,6 +44,7 @@ type Sender struct {
 	HMACKey []byte
 	seq     uint32
 	onError func(error)
+	timeout time.Duration
 	Config  Config
 }
 
@@ -66,11 +70,17 @@ func NewSender(cfg SenderConfig) (*Sender, error) {
 		return nil, err
 	}
 
+	timeout := cfg.Timeout
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+
 	return &Sender{
 		Conn:    conn,
 		HMACKey: cfg.HMACKey,
 		seq:     0,
 		onError: cfg.OnError,
+		timeout: timeout,
 		Config:  cfg.Config,
 	}, nil
 }
@@ -85,7 +95,7 @@ func NewSender(cfg SenderConfig) (*Sender, error) {
 //
 // Only unauthenticated mode is currently supported; Send panics if
 // HMACKey is set.
-func (s *Sender) Send() (uint32, error) {
+func (s *Sender) Send() (*ReflectorPacket, error) {
 	if s.HMACKey != nil {
 		panic("not implemented")
 	}
@@ -94,7 +104,7 @@ func (s *Sender) Send() (uint32, error) {
 		ClockFormat: s.Config.ErrorEstimate.ClockFormat,
 	})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	errorEstimate, err := NewErrorEstimate(
@@ -104,7 +114,7 @@ func (s *Sender) Send() (uint32, error) {
 		s.Config.ErrorEstimate.Multiplier,
 	)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	senderPkt := SenderPacket{
@@ -115,15 +125,34 @@ func (s *Sender) Send() (uint32, error) {
 
 	buf, err := senderPkt.Encode(nil)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	_, err = s.Conn.Write(buf)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return s.seq, nil
+	// Wait for the reflected reply
+	s.Conn.SetReadDeadline(time.Now().Add(s.timeout))
+	rxBuf := make([]byte, 1500)
+	n, err := s.Conn.Read(rxBuf)
+	if err != nil {
+		return nil, fmt.Errorf("waiting for reply: %w", err)
+	}
+
+	if n < 44 {
+		return nil, fmt.Errorf("reply too short: got %d bytes, need 44", n)
+	}
+
+	reply, err := DecodeReflectorPacket(nil, rxBuf[:n])
+	if err != nil {
+		return nil, fmt.Errorf("decoding reply: %w", err)
+	}
+
+	s.seq++
+
+	return reply, nil
 }
 
 // Close releases the underlying socket.
