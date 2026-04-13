@@ -1,10 +1,10 @@
-package controlplane
+package cepheusserver
 
 import (
 	"context"
 	"net/http"
 
-	"cepheus/internal/control-plane/handler"
+	"cepheus/internal/cepheus-server/handler"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

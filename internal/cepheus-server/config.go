@@ -1,4 +1,4 @@
-package controlplane
+package cepheusserver
 
 type Config struct {
 	Listen    string `yaml:"listen"`

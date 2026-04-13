@@ -36,6 +36,9 @@ go.work
 .vscode/**
 !.vscode/extensions.json
 
+# IDEA
+.idea/**
+
 # Claude
 .claude/**
 

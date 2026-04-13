@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"cepheus/internal/control-plane/logattr"
+	"cepheus/internal/cepheus-server/logattr"
 	"encoding/json"
 	"log/slog"
 	"net/http"

@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	cepheusserver "cepheus/internal/cepheus-server"
+	"cepheus/internal/cepheus-server/logattr"
 	"cepheus/internal/common"
 	"cepheus/internal/common/telemetry"
-	controlplane "cepheus/internal/control-plane"
-	"cepheus/internal/control-plane/logattr"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v3"
@@ -38,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var cfg controlplane.Config
+	var cfg cepheusserver.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		log().Error("failed to parse config", "error", err)
 		os.Exit(1)
@@ -77,7 +77,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := controlplane.NewServer(cfg.Listen, pool)
+	srv := cepheusserver.NewServer(cfg.Listen, pool)
 
 	go func() {
 		sig := make(chan os.Signal, 1)
