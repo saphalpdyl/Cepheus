@@ -1,18 +1,40 @@
 package main
 
 import (
-	cepheusagent "cepheus/internal/cepheus-agent"
 	"context"
-	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
+	cepheusagent "cepheus/internal/cepheus-agent"
+	"cepheus/internal/cepheus-agent/logattr"
+	"cepheus/internal/common/telemetry"
+
 	"gopkg.in/yaml.v3"
 )
 
+func log() *slog.Logger {
+	return slog.Default().With(logattr.Domain(logattr.DomainAgentLifecycle))
+}
+
 func main() {
-	// The binary will be called as: cepheus-agent [serial-id] [config-file-path]
+	ctx := context.Background()
+
+	logShutdown, err := telemetry.SetupLogging(ctx, "stdout", "", "cepheus-agent", "", false)
+	if err != nil {
+		slog.Error("failed to setup logging", "error", err)
+		os.Exit(1)
+	}
+	defer logShutdown(ctx)
+
+	traceShutdown, err := telemetry.SetupTracing(ctx, "stdout", "", "cepheus-agent", "", false)
+	if err != nil {
+		slog.Error("failed to setup tracing", "error", err)
+		os.Exit(1)
+	}
+	defer traceShutdown(ctx)
+
 	serialID := ""
 	cfgPath := "cepheus-agent.config.yaml"
 	if len(os.Args) > 1 {
@@ -24,22 +46,22 @@ func main() {
 
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to read config: %v\n", err)
+		log().Error("failed to read config", "path", cfgPath, "error", err)
 		os.Exit(1)
 	}
 
 	var cfg cepheusagent.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to parse config: %v\n", err)
+		log().Error("failed to parse config", "error", err)
 		os.Exit(1)
 	}
 
 	if cfg.ControlPlane.URL == "" {
-		fmt.Fprintf(os.Stderr, "control_plane.url is required\n")
+		log().Error("control_plane.url is required")
 		os.Exit(1)
 	}
 
-	fmt.Printf("cepheus-agent starting, control plane: %s\n", cfg.ControlPlane.URL)
+	log().Info("starting", "control_plane", cfg.ControlPlane.URL, "serial_id", serialID)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
@@ -47,10 +69,10 @@ func main() {
 
 	agent := cepheusagent.NewAgent(cepheusagent.AgentConfig{
 		SerialId:           serialID,
-		LocalBufferSize:    100, // TODO: Make this configurable
+		LocalBufferSize:    100,
 		ControlPlaneConfig: cfg,
 	})
-	agent.Run(context.Background())
+	agent.Run(ctx)
 
-	fmt.Println("cepheus-agent shutting down")
+	log().Info("shutting down")
 }

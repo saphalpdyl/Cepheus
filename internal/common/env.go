@@ -2,14 +2,15 @@ package common
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 )
 
 func TryGetFromEnv(k string) (string, error) {
 	val := os.Getenv(k)
 	if val == "" {
-		fmt.Fprintf(os.Stderr, "missing %s environment variable", k)
-		return "", fmt.Errorf("missing environment variable")
+		slog.Error("missing environment variable", "key", k)
+		return "", fmt.Errorf("missing environment variable: %s", k)
 	}
 
 	return val, nil

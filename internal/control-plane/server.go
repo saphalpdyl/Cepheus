@@ -4,19 +4,19 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
+	"cepheus/internal/control-plane/handler"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Server struct {
-	handler    *Handler
+	handler    *handler.Handler
 	httpServer *http.Server
 }
 
 func NewServer(listenAddr string, dbPool *pgxpool.Pool) *Server {
-	h := &Handler{
-		pool: dbPool,
-		conn: []*pgx.Conn{},
+	h := &handler.Handler{
+		Pool: dbPool,
 	}
 
 	mux := http.NewServeMux()
