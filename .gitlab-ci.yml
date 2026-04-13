@@ -1,0 +1,12 @@
+stages:
+  - test
+
+integration:
+  stage: test
+  script:
+    - make test.integration
+  after_script:
+    - docker compose -f docker-compose.test.yaml down
+  tags:
+    - docker
+    - go
