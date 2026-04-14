@@ -1,2 +1,5 @@
 # Default configuration for cepheus-server.config.yaml
 listen: ":8080"
+telemetry:
+  sink: otel
+  otel_collector_url: otel-collector:4318

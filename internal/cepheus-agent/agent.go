@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/avast/retry-go"
 )
 
 // The control/management plane for cepheus-agent
@@ -53,8 +55,17 @@ func (a *Agent) Run(ctx context.Context) {
 	defer end()
 
 	if a.generation == 0 {
-		err = a.pullConfiguration(ctx)
+		// With retry
+		err = retry.Do(
+			func() error {
+				return a.pullConfiguration(ctx)
+			},
+			retry.Attempts(3),
+			retry.Delay(5*time.Second),
+		)
 	}
+
+	<-ctx.Done()
 }
 
 func (a *Agent) pullConfiguration(ctx context.Context) (err error) {

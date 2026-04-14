@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
@@ -17,23 +18,24 @@ import (
 //   - anything else: no-op (no tracing overhead in stdout/local mode)
 //
 // Returns a shutdown function that flushes pending spans.
-func SetupTracing(ctx context.Context, sink, endpoint, serviceName, instanceID string, insecure bool) (shutdown func(context.Context) error, err error) {
+func SetupTracing(ctx context.Context, sink, endpoint, serviceName, instanceID string, insecure bool, attrs ...attribute.KeyValue) (shutdown func(context.Context) error, err error) {
 	if sink != "otel" {
 		return func(context.Context) error { return nil }, nil
 	}
 
 	opts := []otlptracehttp.Option{
 		otlptracehttp.WithEndpoint(endpoint),
-	}
-	if insecure {
-		opts = append(opts, otlptracehttp.WithInsecure())
+		otlptracehttp.WithInsecure(),
+		otlptracehttp.WithRetry(otlptracehttp.RetryConfig{
+			Enabled: true,
+		}),
 	}
 	exporter, err := otlptracehttp.New(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := ServiceResource(serviceName, instanceID)
+	res, err := ServiceResource(serviceName, instanceID, attrs...)
 	if err != nil {
 		return nil, err
 	}

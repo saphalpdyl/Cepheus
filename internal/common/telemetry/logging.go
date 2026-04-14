@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 )
@@ -16,7 +17,7 @@ import (
 //
 // Both sinks filter out DEBUG-level logs (slog.LevelInfo minimum).
 // Returns a shutdown function (no-op for stdout sink).
-func SetupLogging(ctx context.Context, sink, endpoint, serviceName, instanceID string, insecure bool) (shutdown func(context.Context) error, err error) {
+func SetupLogging(ctx context.Context, sink, endpoint, serviceName, instanceID string, insecure bool, attrs ...attribute.KeyValue) (shutdown func(context.Context) error, err error) {
 	if sink != "otel" {
 		handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})
 		slog.SetDefault(slog.New(handler).With(slog.String("service.instance.id", instanceID)))
@@ -25,16 +26,17 @@ func SetupLogging(ctx context.Context, sink, endpoint, serviceName, instanceID s
 
 	opts := []otlploghttp.Option{
 		otlploghttp.WithEndpoint(endpoint),
-	}
-	if insecure {
-		opts = append(opts, otlploghttp.WithInsecure())
+		otlploghttp.WithInsecure(),
+		otlploghttp.WithRetry(otlploghttp.RetryConfig{
+			Enabled: true,
+		}),
 	}
 	exporter, err := otlploghttp.New(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := ServiceResource(serviceName, instanceID)
+	res, err := ServiceResource(serviceName, instanceID, attrs...)
 	if err != nil {
 		return nil, err
 	}
