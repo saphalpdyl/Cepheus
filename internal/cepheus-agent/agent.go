@@ -2,8 +2,8 @@ package cepheusagent
 
 import (
 	"cepheus/internal/cepheus-agent/logattr"
-	"cepheus/internal/common"
 	"cepheus/internal/telemetry"
+	api "cepheus/pkg/api"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -36,7 +36,7 @@ type Agent struct {
 	lastConfigurationPulled time.Time
 
 	mu          sync.RWMutex
-	agentConfig *common.AgentConfig
+	agentConfig *api.AgentConfig
 }
 
 type AgentInitConfig struct {
@@ -66,7 +66,7 @@ func (a *Agent) pullAgentConfiguration(ctx context.Context) {
 	ctx, end, span := telemetry.SpanWithErr(ctx, "Agent.pullAgentConfiguration", nil)
 	defer end()
 
-	var agentConfig *common.AgentConfig
+	var agentConfig *api.AgentConfig
 
 	err := retry.Do(
 		func() error {
@@ -96,7 +96,7 @@ func (a *Agent) pullAgentConfiguration(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (a *Agent) pullConfiguration(ctx context.Context) (config *common.AgentConfig, err error) {
+func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig, err error) {
 	ctx, end, _ := telemetry.SpanWithErr(ctx, "Agent.PullConfiguration", &err)
 	defer end()
 
@@ -131,7 +131,7 @@ func (a *Agent) pullConfiguration(ctx context.Context) (config *common.AgentConf
 		return nil, err
 	}
 
-	var configResult common.AgentConfig
+	var configResult api.AgentConfig
 	if err = json.Unmarshal(body, &configResult); err != nil {
 		log().Error("failed to unmarshal agent configuration", logattr.Err(err))
 		return nil, err

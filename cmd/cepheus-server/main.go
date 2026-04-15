@@ -14,7 +14,7 @@ import (
 	cepheusserver "cepheus/internal/cepheus-server"
 	"cepheus/internal/cepheus-server/logattr"
 	"cepheus/internal/common"
-	"cepheus/internal/common/telemetry"
+	"cepheus/internal/telemetry"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v3"

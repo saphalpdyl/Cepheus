@@ -2,8 +2,8 @@ package handler
 
 import (
 	"cepheus/internal/cepheus-server/logattr"
-	"cepheus/internal/common"
 	"cepheus/internal/telemetry"
+	api "cepheus/pkg/api"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,11 +23,10 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 	log().Info("fetching agent config", "serial_id", serialID)
 
 	rows, err := h.Pool.Query(ctx,
-		`SELECT c.version, c.generation,
+		`SELECT c.id, c.generation,
 		        c.report_endpoint, c.report_batch_size, c.report_interval_seconds,
-		        EXTRACT(EPOCH FROM c.created_at)::bigint,
 		        EXTRACT(EPOCH FROM c.updated_at)::bigint,
-		        t.task_id, t.type, t.enabled, t.params
+		        t.task_id, t.type, t.enabled, t.generation, t.params
 		 FROM device d
 		 JOIN agent_config c ON c.id = d.agent_config_id
 		 LEFT JOIN agent_task t ON t.agent_config_id = c.id
@@ -41,19 +40,20 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var cfg common.AgentConfig
+	var cfg api.AgentConfig
 	found := false
 	for rows.Next() {
 		var taskID *string
-		var taskType *common.AgentTaskType
+		var taskType *api.AgentTaskType
 		var taskEnabled *bool
+		var taskGeneration *int
 		var taskParams *json.RawMessage
 
 		if err = rows.Scan(
-			&cfg.Version, &cfg.Generation,
+			&cfg.ID, &cfg.Generation,
 			&cfg.ReportEndpoint, &cfg.ReportBatchSize, &cfg.ReportIntervalSeconds,
-			&cfg.CreatedAt, &cfg.UpdatedAt,
-			&taskID, &taskType, &taskEnabled, &taskParams,
+			&cfg.UpdatedAt,
+			&taskID, &taskType, &taskEnabled, &taskGeneration, &taskParams,
 		); err != nil {
 			log().Error("scan failed", "serial_id", serialID, logattr.Err(err))
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("scan failed: %v", err))
@@ -61,11 +61,16 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		found = true
 		if taskID != nil {
-			cfg.Tasks = append(cfg.Tasks, common.AgentTask{
-				TaskID:  *taskID,
-				Type:    *taskType,
-				Enabled: *taskEnabled,
-				Params:  *taskParams,
+			var params json.RawMessage
+			if taskParams != nil {
+				params = *taskParams
+			}
+			cfg.Tasks = append(cfg.Tasks, api.Task{
+				TaskID:     *taskID,
+				Type:       *taskType,
+				Enabled:    *taskEnabled,
+				Generation: *taskGeneration,
+				Params:     params,
 			})
 		}
 	}
@@ -77,7 +82,10 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if cfg.Tasks == nil {
-		cfg.Tasks = []common.AgentTask{}
+		cfg.Tasks = []api.Task{}
+	}
+	if cfg.PendingActions == nil {
+		cfg.PendingActions = []api.PendingAction{}
 	}
 
 	writeJSON(w, http.StatusOK, cfg)

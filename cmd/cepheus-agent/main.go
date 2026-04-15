@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	cepheusagent "cepheus/internal/cepheus-agent"
-	"cepheus/internal/common/telemetry"
+	"cepheus/internal/telemetry"
 
 	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/yaml.v3"
