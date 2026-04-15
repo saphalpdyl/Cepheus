@@ -7,7 +7,7 @@
 //	slog.LogAttrs(ctx, slog.LevelInfo, "configuration applied",
 //	    logattr.DurationMs(elapsed.Milliseconds()),
 //	)
-package logattr
+package log
 
 import "log/slog"
 

@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"cepheus/internal/cepheus-server/logattr"
+	logattr "cepheus/internal/cepheus-server/log"
 	"cepheus/internal/telemetry"
 	"encoding/json"
 	"fmt"

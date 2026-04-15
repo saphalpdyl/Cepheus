@@ -1,7 +1,7 @@
 package cepheusagent
 
 import (
-	"cepheus/internal/cepheus-agent/logattr"
+	logattr "cepheus/internal/cepheus-agent/log"
 	"cepheus/internal/telemetry"
 	api "cepheus/pkg/api"
 	"context"

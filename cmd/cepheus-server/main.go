@@ -12,7 +12,7 @@ import (
 	"time"
 
 	cepheusserver "cepheus/internal/cepheus-server"
-	"cepheus/internal/cepheus-server/logattr"
+	logattr "cepheus/internal/cepheus-server/log"
 	"cepheus/internal/common"
 	"cepheus/internal/telemetry"
 
