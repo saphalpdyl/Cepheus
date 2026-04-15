@@ -1,6 +1,6 @@
 package cepheusagent
 
-type Config struct {
+type ControlPlaneConfig struct {
 	ControlPlane struct {
 		URL            string `yaml:"url"`
 		ConfigEndpoint string `yaml:"config_endpoint"`

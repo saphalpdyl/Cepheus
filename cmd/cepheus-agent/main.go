@@ -38,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var cfg cepheusagent.Config
+	var cfg cepheusagent.ControlPlaneConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		slog.Error("failed to parse config", "error", err)
 		os.Exit(1)
@@ -72,7 +72,7 @@ func main() {
 
 	slog.Info("starting", "control_plane", cfg.ControlPlane.URL, "serial_id", serialID)
 
-	agent := cepheusagent.NewAgent(cepheusagent.AgentConfig{
+	agent := cepheusagent.NewAgent(cepheusagent.AgentInitConfig{
 		SerialId:           serialID,
 		LocalBufferSize:    100,
 		ControlPlaneConfig: cfg,
