@@ -3,7 +3,7 @@ package cepheusagent
 import (
 	"cepheus/internal/cepheus-agent/logattr"
 	"cepheus/internal/common"
-	"cepheus/internal/common/telemetry"
+	"cepheus/internal/telemetry"
 	"context"
 	"encoding/json"
 	"fmt"

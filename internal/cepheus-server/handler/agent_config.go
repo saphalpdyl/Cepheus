@@ -3,7 +3,7 @@ package handler
 import (
 	"cepheus/internal/cepheus-server/logattr"
 	"cepheus/internal/common"
-	"cepheus/internal/common/telemetry"
+	"cepheus/internal/telemetry"
 	"encoding/json"
 	"fmt"
 	"net/http"
