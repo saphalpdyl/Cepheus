@@ -87,7 +87,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	supervisor.SetDesiredTasks(a.agentConfig.Tasks)
 
 	go func() {
-		ticker := time.NewTicker(time.Duration(a.agentConfig.ReportIntervalSeconds) * time.Second)
+		ticker := time.NewTicker(time.Duration(a.controlPlaneConfig.ControlPlane.ConfigPullIntervalSeconds) * time.Second)
 		defer ticker.Stop()
 
 		for {

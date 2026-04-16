@@ -2,6 +2,7 @@
 control_plane: 
   url: http://192.168.121.1:8070
   config_endpoint: /api/v1/devices/config/
+  config_pull_interval_secs: 30
 telemetry:
   sink: otel
   otel_collector_url: 192.168.121.1:4318
