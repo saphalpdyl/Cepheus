@@ -86,6 +86,27 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	a.logger.InfoContext(ctx, "started supervisor")
 	supervisor.SetDesiredTasks(a.agentConfig.Tasks)
 
+	go func() {
+		ticker := time.NewTicker(time.Duration(a.agentConfig.ReportIntervalSeconds) * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				err := a.pullAgentConfiguration(ctx)
+				if err != nil {
+					continue
+				}
+
+				a.lastConfigurationPulled = time.Now()
+
+				supervisor.SetDesiredTasks(a.agentConfig.Tasks)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	<-ctx.Done()
 	return nil
 }
