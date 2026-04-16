@@ -1,7 +1,7 @@
 package cepheusagent
 
 import (
-	logattr "cepheus/internal/cepheus-agent/log"
+	"cepheus/internal/cepheus-agent/log"
 	"cepheus/internal/telemetry"
 	api "cepheus/pkg/api"
 	"context"
@@ -22,10 +22,6 @@ import (
 // - Manages lifecycle of probes in goroutines, and restarts them if they fail
 // - Reports batched probe results to the control plane at assigned intervals
 
-func log() *slog.Logger {
-	return slog.Default().With(logattr.Domain(logattr.DomainAgentLifecycle))
-}
-
 type Agent struct {
 	SerialId           string
 	generation         int
@@ -40,6 +36,8 @@ type Agent struct {
 
 	// initial configuration
 	scamperBinPath string
+
+	logger *slog.Logger
 }
 
 type AgentInitConfig struct {
@@ -47,6 +45,8 @@ type AgentInitConfig struct {
 	LocalBufferSize    int
 	ControlPlaneConfig ControlPlaneConfig
 	ScamperBinPath     string
+
+	Logger *slog.Logger
 }
 
 func NewAgent(cfg AgentInitConfig) *Agent {
@@ -64,12 +64,19 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 
 	err = a.pullAgentConfiguration(ctx)
 	if err != nil {
-		log().ErrorContext(ctx, "failed to pull agent configuration", logattr.Err(err))
+		a.logger.ErrorContext(ctx, "failed to pull agent configuration", logattr.Err(err))
 		return err
 	}
 
 	scamper := NewScamper(a.scamperBinPath, a.agentConfig.ScamperPPS)
-	_ = scamper
+
+	supervisor := NewSupervisor(SupervisorConfig{
+		Ctx:     ctx,
+		Scamper: scamper,
+		Logger:  slog.Default().With(log.Domain(log.DomainAgentSupervisor)),
+	})
+
+	supervisor.SetDesiredTasks(a.agentConfig.Tasks)
 
 	<-ctx.Done()
 	return nil
@@ -98,7 +105,7 @@ func (a *Agent) pullAgentConfiguration(ctx context.Context) error {
 	)
 
 	if err != nil {
-		log().ErrorContext(ctx, "error with pulling agent configuration")
+		a.logger.ErrorContext(ctx, "error with pulling agent configuration")
 		return err
 	}
 
@@ -115,41 +122,41 @@ func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig,
 
 	configUrl, err := url.JoinPath(a.controlPlaneConfig.ControlPlane.URL, a.controlPlaneConfig.ControlPlane.ConfigEndpoint, a.SerialId)
 	if err != nil {
-		log().Error("failed to join path for config URL", logattr.Err(err))
+		a.logger.Error("failed to join path for config URL", logattr.Err(err))
 		return nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, configUrl, nil)
 	if err != nil {
-		log().Error("failed to create request", logattr.Err(err))
+		a.logger.Error("failed to create request", logattr.Err(err))
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log().Error("failed to fetch configuration", logattr.Err(err))
+		a.logger.Error("failed to fetch configuration", logattr.Err(err))
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log().Error("failed to fetch configuration", "status", resp.Status)
+		a.logger.Error("failed to fetch configuration", "status", resp.Status)
 		return nil, fmt.Errorf("failed to fetch configuration: %v", resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log().Error("failed to read configuration response body", logattr.Err(err))
+		a.logger.Error("failed to read configuration response body", logattr.Err(err))
 		return nil, err
 	}
 
 	var configResult api.AgentConfig
 	if err = json.Unmarshal(body, &configResult); err != nil {
-		log().Error("failed to unmarshal agent configuration", logattr.Err(err))
+		a.logger.Error("failed to unmarshal agent configuration", logattr.Err(err))
 		return nil, err
 	}
 
-	log().Info("configuration pulled", "serial_id", a.SerialId)
+	a.logger.Info("configuration pulled", "serial_id", a.SerialId)
 	return &configResult, nil
 }

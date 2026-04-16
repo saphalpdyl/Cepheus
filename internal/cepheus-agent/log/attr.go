@@ -7,7 +7,7 @@
 //	slog.LogAttrs(ctx, slog.LevelInfo, "configuration applied",
 //	    logattr.DurationMs(elapsed.Milliseconds()),
 //	)
-package logattr
+package log
 
 import "log/slog"
 
@@ -16,7 +16,7 @@ type LogDomain string
 // This will be used as a top-level classifier when categorizing log domains
 const (
 	DomainAgentLifecycle  LogDomain = "AGENT_LIFECYCLE"
-	DomainAgentReconciler LogDomain = "AGENT_RECONCILER"
+	DomainAgentSupervisor LogDomain = "AGENT_SUPERVISOR"
 )
 
 // ── Domain/Context ────────────────────────────────────────────────────────────

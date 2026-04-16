@@ -22,8 +22,10 @@ CREATE TABLE IF NOT EXISTS agent_task (
     task_id         TEXT        NOT NULL,
     type            TEXT        NOT NULL,
     enabled         BOOLEAN     NOT NULL DEFAULT true,
-    generation      INT         NOT NULL DEFAULT 1,
-    params          JSONB       NOT NULL DEFAULT '{}',
+    generation              INT     NOT NULL DEFAULT 1,
+    schedule_interval_seconds INT   NOT NULL DEFAULT 0,
+    schedule_jitter_percent   INT   NOT NULL DEFAULT 0,
+    params                  JSONB   NOT NULL DEFAULT '{}',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
