@@ -1,0 +1,16 @@
+ARG SCAMPER_VERSION=20260331
+
+FROM dockcross/linux-x64:latest AS builder
+ARG SCAMPER_VERSION
+
+WORKDIR /src
+
+RUN wget https://www.caida.org/catalog/software/scamper/code/scamper-cvs-${SCAMPER_VERSION}.tar.gz
+RUN tar -vxzf scamper-cvs-${SCAMPER_VERSION}.tar.gz
+WORKDIR /src/scamper-cvs-${SCAMPER_VERSION}
+
+RUN ./configure --host=${CROSS_TRIPLE} && make
+
+FROM scratch
+ARG SCAMPER_VERSION
+COPY --from=builder /src/scamper-cvs-${SCAMPER_VERSION}/scamper/scamper /cepheus-agent/scamper

@@ -54,15 +54,21 @@ func NewAgent(cfg AgentInitConfig) *Agent {
 	}
 }
 
-func (a *Agent) Run(ctx context.Context) {
-	var err error
+func (a *Agent) Run(ctx context.Context) (err error) {
 	ctx, end, _ := telemetry.SpanWithErr(ctx, "Agent.Run", &err)
 	defer end()
 
+	err = a.pullAgentConfiguration(ctx)
+	if err != nil {
+		log().ErrorContext(ctx, "failed to pull agent configuration", logattr.Err(err))
+		return err
+	}
+
 	<-ctx.Done()
+	return nil
 }
 
-func (a *Agent) pullAgentConfiguration(ctx context.Context) {
+func (a *Agent) pullAgentConfiguration(ctx context.Context) error {
 	ctx, end, span := telemetry.SpanWithErr(ctx, "Agent.pullAgentConfiguration", nil)
 	defer end()
 
@@ -86,14 +92,14 @@ func (a *Agent) pullAgentConfiguration(ctx context.Context) {
 
 	if err != nil {
 		log().ErrorContext(ctx, "error with pulling agent configuration")
-		return
+		return err
 	}
 
 	if a.generation == 0 {
 		a.agentConfig = agentConfig
 	}
 
-	<-ctx.Done()
+	return nil
 }
 
 func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig, err error) {

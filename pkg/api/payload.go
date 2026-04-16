@@ -5,9 +5,8 @@ import "encoding/json"
 type AgentTaskType string
 
 const (
-	TaskTypeStamp   AgentTaskType = "stamp"
-	TaskTypeTrace   AgentTaskType = "trace"
-	TaskTypeRestart AgentTaskType = "restart" // Highest precedence, should be executed immediately
+	TaskTypeStamp AgentTaskType = "stamp"
+	TaskTypeTrace AgentTaskType = "trace"
 )
 
 type AgentTaskSchedule struct {
