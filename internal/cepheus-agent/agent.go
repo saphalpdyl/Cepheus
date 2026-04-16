@@ -37,12 +37,16 @@ type Agent struct {
 
 	mu          sync.RWMutex
 	agentConfig *api.AgentConfig
+
+	// initial configuration
+	scamperBinPath string
 }
 
 type AgentInitConfig struct {
 	SerialId           string
 	LocalBufferSize    int
 	ControlPlaneConfig ControlPlaneConfig
+	ScamperBinPath     string
 }
 
 func NewAgent(cfg AgentInitConfig) *Agent {
@@ -63,6 +67,9 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		log().ErrorContext(ctx, "failed to pull agent configuration", logattr.Err(err))
 		return err
 	}
+
+	scamper := NewScamper(a.scamperBinPath, a.agentConfig.ScamperPPS)
+	_ = scamper
 
 	<-ctx.Done()
 	return nil

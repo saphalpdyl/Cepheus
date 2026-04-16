@@ -1,12 +1,18 @@
 package api
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 type AgentTaskType string
 
 const (
-	TaskTypeStamp AgentTaskType = "stamp"
-	TaskTypeTrace AgentTaskType = "trace"
+	TaskTypeStamp   AgentTaskType = "stamp"
+	TaskTypeTrace   AgentTaskType = "trace"
+	TaskTypeTraceLb AgentTaskType = "tracelb"
+	TaskTypePing    AgentTaskType = "ping"
 )
 
 type AgentTaskSchedule struct {
@@ -18,6 +24,45 @@ type AgentTaskParams struct {
 	Schedule AgentTaskSchedule `json:"schedule"`
 }
 
+type AgentTaskPingParams struct {
+	AgentTaskParams
+	Target   string `json:"target"`
+	SourceIP string `json:"source_ip,omitempty"`
+	Count    int    `json:"count"`
+	Size     int    `json:"size"`
+	Dscp     int    `json:"dscp,omitempty"`
+	Timeout  int    `json:"timeout_seconds,omitempty"`
+}
+
+type TraceProbeMethod string
+
+const (
+	TraceMethodICMPParis TraceProbeMethod = "icmp-paris"
+	TraceMethodUDPParis  TraceProbeMethod = "udp-paris"
+	TraceMethodTCP       TraceProbeMethod = "tcp"
+)
+
+type AgentTaskTraceParams struct {
+	AgentTaskParams
+	Target      string           `json:"target"`
+	SourceIP    string           `json:"source_ip,omitempty"`
+	Method      TraceProbeMethod `json:"method"`
+	MaxTTL      int              `json:"max_ttl,omitempty"`
+	FirstTTL    int              `json:"first_ttl,omitempty"`
+	Dscp        int              `json:"dscp,omitempty"`
+	WaitSeconds int              `json:"wait_seconds,omitempty"`
+}
+
+type AgentTaskTraceLbParams struct {
+	AgentTaskParams
+	Target     string  `json:"target"`
+	SourceIP   string  `json:"source_ip,omitempty"`
+	MaxTTL     int     `json:"max_ttl,omitempty"`
+	FirstTTL   int     `json:"first_ttl,omitempty"`
+	Dscp       int     `json:"dscp,omitempty"`
+	Confidence float64 `json:"confidence,omitempty"`
+}
+
 type StampMode string
 
 const (
@@ -27,12 +72,11 @@ const (
 
 type AgentTaskStampParams struct {
 	AgentTaskParams
-
 	Mode             StampMode `json:"mode"`
 	Target           string    `json:"target"`
 	TargetPort       int       `json:"target_port"`
-	SourceIP         string    `json:"source_ip"`
-	Dscp             int       `json:"dscp"`
+	SourceIP         string    `json:"source_ip,omitempty"`
+	Dscp             int       `json:"dscp,omitempty"`
 	RequireClockSync bool      `json:"require_clock_sync"`
 }
 
@@ -44,10 +88,40 @@ type Task struct {
 	Params     json.RawMessage `json:"params"`
 }
 
+func (t *Task) ParseParams() (interface{}, error) {
+	switch t.Type {
+	case TaskTypePing:
+		var p AgentTaskPingParams
+		return &p, json.Unmarshal(t.Params, &p)
+	case TaskTypeTrace:
+		var p AgentTaskTraceParams
+		return &p, json.Unmarshal(t.Params, &p)
+	case TaskTypeTraceLb:
+		var p AgentTaskTraceLbParams
+		return &p, json.Unmarshal(t.Params, &p)
+	case TaskTypeStamp:
+		var p AgentTaskStampParams
+		return &p, json.Unmarshal(t.Params, &p)
+	default:
+		return nil, fmt.Errorf("unknown task type: %s", t.Type)
+	}
+}
+
+type PendingActionType string
+
+const (
+	PendingActionRestart PendingActionType = "restart"
+)
+
+type PendingActionBaseParams struct {
+	ScheduledOn time.Time `json:"scheduled_on"`
+}
+
 type PendingAction struct {
-	ID        string `json:"id"`
-	Type      string `json:"type"`
-	CreatedOn int    `json:"created_on"`
+	ID        string                  `json:"id"`
+	Type      PendingActionType       `json:"type"`
+	CreatedOn int                     `json:"created_on"`
+	Params    PendingActionBaseParams `json:"params"`
 }
 
 type AgentConfig struct {
@@ -59,4 +133,5 @@ type AgentConfig struct {
 	PendingActions        []PendingAction `json:"pending_actions"`
 	Tasks                 []Task          `json:"tasks"`
 	UpdatedAt             int             `json:"updated_at"`
+	ScamperPPS            int             `json:"scamper_pps"`
 }

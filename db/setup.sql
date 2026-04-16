@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS agent_config (
     report_endpoint         TEXT        NOT NULL DEFAULT '',
     report_batch_size       INT         NOT NULL DEFAULT 1,
     report_interval_seconds INT         NOT NULL DEFAULT 60,
+    scamper_pps             INT         NOT NULL DEFAULT 100,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -27,6 +28,16 @@ CREATE TABLE IF NOT EXISTS agent_task (
 );
 
 CREATE INDEX IF NOT EXISTS idx_agent_task_config_id ON agent_task(agent_config_id);
+
+CREATE TABLE IF NOT EXISTS pending_action (
+    id              TEXT        PRIMARY KEY,
+    agent_config_id TEXT        NOT NULL REFERENCES agent_config(id) ON DELETE CASCADE,
+    type            TEXT        NOT NULL,
+    params          JSONB       NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_action_config_id ON pending_action(agent_config_id);
 
 CREATE TABLE IF NOT EXISTS agent_data (
     id         BIGSERIAL   PRIMARY KEY,

@@ -19,6 +19,7 @@ func main() {
 
 	serialID := ""
 	cfgPath := "cepheus-agent.config.yaml"
+	scamperBinPath := "scamper"
 	if len(os.Args) > 1 {
 		serialID = os.Args[1]
 	}
@@ -30,6 +31,10 @@ func main() {
 
 	if len(os.Args) > 2 {
 		cfgPath = os.Args[2]
+	}
+
+	if len(os.Args) > 3 {
+		scamperBinPath = os.Args[3]
 	}
 
 	data, err := os.ReadFile(cfgPath)
@@ -76,6 +81,7 @@ func main() {
 		SerialId:           serialID,
 		LocalBufferSize:    100,
 		ControlPlaneConfig: cfg,
+		ScamperBinPath:     scamperBinPath,
 	})
 	agent.Run(ctx)
 
