@@ -1,10 +1,9 @@
 package cepheusserver
 
 import (
+	"cepheus/cepheus-server/handler"
 	"context"
 	"net/http"
-
-	"cepheus/internal/cepheus-server/handler"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

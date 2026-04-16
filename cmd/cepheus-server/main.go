@@ -3,6 +3,10 @@
 package main
 
 import (
+	cepheusserver "cepheus/cepheus-server"
+	logattr "cepheus/cepheus-server/log"
+	"cepheus/common"
+	"cepheus/telemetry"
 	"context"
 	"log/slog"
 	"net/http"
@@ -10,11 +14,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	cepheusserver "cepheus/internal/cepheus-server"
-	logattr "cepheus/internal/cepheus-server/log"
-	"cepheus/internal/common"
-	"cepheus/internal/telemetry"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v3"

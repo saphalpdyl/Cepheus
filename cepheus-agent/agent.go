@@ -1,9 +1,9 @@
 package cepheusagent
 
 import (
-	"cepheus/internal/cepheus-agent/log"
-	"cepheus/internal/telemetry"
+	"cepheus/cepheus-agent/log"
 	api "cepheus/pkg/api"
+	"cepheus/telemetry"
 	"context"
 	"encoding/json"
 	"fmt"

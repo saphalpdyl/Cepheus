@@ -1,16 +1,15 @@
 package main
 
 import (
+	cepheusagent "cepheus/cepheus-agent"
+	"cepheus/cepheus-agent/log"
+	telemetry "cepheus/telemetry"
 	"context"
 	"log/slog"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
-
-	cepheusagent "cepheus/internal/cepheus-agent"
-	"cepheus/internal/cepheus-agent/log"
-	"cepheus/internal/telemetry"
 
 	"github.com/kardianos/osext"
 	"go.opentelemetry.io/otel/attribute"
