@@ -26,7 +26,8 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 		`SELECT c.id, c.generation,
 		        c.report_endpoint, c.report_batch_size, c.report_interval_seconds,
 		        EXTRACT(EPOCH FROM c.updated_at)::bigint,
-		        t.task_id, t.type, t.enabled, t.generation, t.params
+		        t.task_id, t.type, t.enabled, t.generation, t.params,
+		        t.schedule_interval_seconds, t.schedule_jitter_percent
 		 FROM device d
 		 JOIN agent_config c ON c.id = d.agent_config_id
 		 LEFT JOIN agent_task t ON t.agent_config_id = c.id
@@ -48,12 +49,15 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 		var taskEnabled *bool
 		var taskGeneration *int
 		var taskParams *json.RawMessage
+		var scheduleInterval *int
+		var scheduleJitter *int
 
 		if err = rows.Scan(
 			&cfg.ID, &cfg.Generation,
 			&cfg.ReportEndpoint, &cfg.ReportBatchSize, &cfg.ReportIntervalSeconds,
 			&cfg.UpdatedAt,
 			&taskID, &taskType, &taskEnabled, &taskGeneration, &taskParams,
+			&scheduleInterval, &scheduleJitter,
 		); err != nil {
 			log().Error("scan failed", "serial_id", serialID, logattr.Err(err))
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("scan failed: %v", err))
@@ -65,13 +69,20 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 			if taskParams != nil {
 				params = *taskParams
 			}
-			cfg.Tasks = append(cfg.Tasks, api.Task{
+			task := api.Task{
 				TaskID:     *taskID,
 				Type:       *taskType,
 				Enabled:    *taskEnabled,
 				Generation: *taskGeneration,
 				Params:     params,
-			})
+			}
+			if scheduleInterval != nil {
+				task.Schedule.IntervalSeconds = *scheduleInterval
+			}
+			if scheduleJitter != nil {
+				task.Schedule.JitterPercent = *scheduleJitter
+			}
+			cfg.Tasks = append(cfg.Tasks, task)
 		}
 	}
 

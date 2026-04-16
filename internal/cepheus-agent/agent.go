@@ -55,6 +55,8 @@ func NewAgent(cfg AgentInitConfig) *Agent {
 		generation:         0,
 		probeDataBuffer:    make(chan any, cfg.LocalBufferSize), // TODO: Change to a defined type
 		controlPlaneConfig: cfg.ControlPlaneConfig,
+		logger:             cfg.Logger,
+		scamperBinPath:     cfg.ScamperBinPath,
 	}
 }
 
@@ -64,18 +66,24 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 
 	err = a.pullAgentConfiguration(ctx)
 	if err != nil {
-		a.logger.ErrorContext(ctx, "failed to pull agent configuration", logattr.Err(err))
+		a.logger.ErrorContext(ctx, "failed to pull agent configuration", log.Err(err))
 		return err
 	}
 
 	scamper := NewScamper(a.scamperBinPath, a.agentConfig.ScamperPPS)
+	err = scamper.Start()
+	if err != nil {
+		a.logger.ErrorContext(ctx, "cannot start scamper", log.Err(err))
+		return err
+	}
 
 	supervisor := NewSupervisor(SupervisorConfig{
 		Ctx:     ctx,
 		Scamper: scamper,
-		Logger:  slog.Default().With(log.Domain(log.DomainAgentSupervisor)),
+		Logger:  a.logger,
 	})
 
+	a.logger.InfoContext(ctx, "started supervisor")
 	supervisor.SetDesiredTasks(a.agentConfig.Tasks)
 
 	<-ctx.Done()
@@ -122,20 +130,20 @@ func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig,
 
 	configUrl, err := url.JoinPath(a.controlPlaneConfig.ControlPlane.URL, a.controlPlaneConfig.ControlPlane.ConfigEndpoint, a.SerialId)
 	if err != nil {
-		a.logger.Error("failed to join path for config URL", logattr.Err(err))
+		a.logger.Error("failed to join path for config URL", log.Err(err))
 		return nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, configUrl, nil)
 	if err != nil {
-		a.logger.Error("failed to create request", logattr.Err(err))
+		a.logger.Error("failed to create request", log.Err(err))
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		a.logger.Error("failed to fetch configuration", logattr.Err(err))
+		a.logger.Error("failed to fetch configuration", log.Err(err))
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -147,13 +155,13 @@ func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig,
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		a.logger.Error("failed to read configuration response body", logattr.Err(err))
+		a.logger.Error("failed to read configuration response body", log.Err(err))
 		return nil, err
 	}
 
 	var configResult api.AgentConfig
 	if err = json.Unmarshal(body, &configResult); err != nil {
-		a.logger.Error("failed to unmarshal agent configuration", logattr.Err(err))
+		a.logger.Error("failed to unmarshal agent configuration", log.Err(err))
 		return nil, err
 	}
 

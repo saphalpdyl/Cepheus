@@ -56,6 +56,8 @@ func (s *Supervisor) startTask(spec *api.Task) *RunningTask {
 		defer close(done)
 	}()
 
+	go s.startTaskLoop(s.ctx, rt)
+
 	return rt
 }
 
@@ -66,7 +68,12 @@ func (s *Supervisor) startTaskLoop(ctx context.Context, rt *RunningTask) {
 		return
 	}
 
-	interval := time.Duration(rt.Spec.Schedule.IntervalSeconds)
+	interval := time.Duration(rt.Spec.Schedule.IntervalSeconds) * time.Second
+	if interval <= 0 {
+		s.logger.ErrorContext(ctx, "interval less than zero", "interval", interval.Seconds(), "interval_raw", rt.Spec.Schedule.IntervalSeconds)
+		return
+	}
+
 	jitter := computeJitter(interval, rt.Spec.Schedule.JitterPercent)
 
 	select {
@@ -101,15 +108,11 @@ func (s *Supervisor) SetDesiredTasks(tasks []api.Task) {
 	}
 	s.desired = desired
 
-	// Signal the reconcile loop, don't act here
-	// s.reconcileNotify()
-	s.reconcile()
+	s.logger.InfoContext(s.ctx, "Reconcilation starting...")
+	s.reconcile(s.ctx)
 }
 
-func (s *Supervisor) reconcile() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+func (s *Supervisor) reconcile(ctx context.Context) {
 	// Stop removed tasks
 	for id, _ := range s.running {
 		if _, ok := s.desired[id]; !ok {
@@ -118,12 +121,15 @@ func (s *Supervisor) reconcile() {
 		}
 	}
 
+	s.logger.InfoContext(ctx, "finished removing undesired tasks")
+
 	for id, desired := range s.desired {
 		running, exists := s.running[id]
 
 		if !exists {
 			// New task — start it
-			s.running[id] = s.startTask(&desired)
+			rt := s.startTask(&desired)
+			s.running[id] = rt
 			continue
 		}
 

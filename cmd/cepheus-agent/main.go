@@ -5,11 +5,14 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path"
 	"syscall"
 
 	cepheusagent "cepheus/internal/cepheus-agent"
+	"cepheus/internal/cepheus-agent/log"
 	"cepheus/internal/telemetry"
 
+	"github.com/kardianos/osext"
 	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/yaml.v3"
 )
@@ -19,7 +22,8 @@ func main() {
 
 	serialID := ""
 	cfgPath := "cepheus-agent.config.yaml"
-	scamperBinPath := "scamper"
+	scamperBinPath := ""
+
 	if len(os.Args) > 1 {
 		serialID = os.Args[1]
 	}
@@ -35,6 +39,13 @@ func main() {
 
 	if len(os.Args) > 3 {
 		scamperBinPath = os.Args[3]
+	} else {
+		dirPath, err := osext.ExecutableFolder()
+		if err != nil {
+			slog.ErrorContext(ctx, "cannot get Executable directory")
+		}
+
+		scamperBinPath = path.Join(dirPath, "scamper")
 	}
 
 	data, err := os.ReadFile(cfgPath)
@@ -82,6 +93,7 @@ func main() {
 		LocalBufferSize:    100,
 		ControlPlaneConfig: cfg,
 		ScamperBinPath:     scamperBinPath,
+		Logger:             slog.Default().With(log.Domain(log.DomainAgentSupervisor)),
 	})
 	agent.Run(ctx)
 
