@@ -28,7 +28,7 @@ type Agent struct {
 	generation         int
 	controlPlaneConfig ControlPlaneConfig
 
-	probeDataBuffer chan any // TODO: Change to a defined type
+	probeDataStream chan api.ProbeResult
 
 	lastConfigurationPulled time.Time
 
@@ -54,7 +54,7 @@ func NewAgent(cfg AgentInitConfig) *Agent {
 	return &Agent{
 		SerialId:           cfg.SerialId,
 		generation:         0,
-		probeDataBuffer:    make(chan any, cfg.LocalBufferSize), // TODO: Change to a defined type
+		probeDataStream:    make(chan api.ProbeResult, cfg.LocalBufferSize), // TODO: Change to a defined type
 		controlPlaneConfig: cfg.ControlPlaneConfig,
 		logger:             cfg.Logger,
 		scamperBinPath:     cfg.ScamperBinPath,
@@ -89,9 +89,10 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	}
 
 	supervisor := NewSupervisor(SupervisorConfig{
-		Ctx:     ctx,
-		Scamper: scamper,
-		Logger:  a.logger,
+		Ctx:             ctx,
+		Scamper:         scamper,
+		Logger:          a.logger,
+		ProbeDataStream: a.probeDataStream,
 		Executors: map[api.AgentTaskType]Executor{
 			api.TaskTypeStampSender: NewStampSenderExecutor(
 				stampConfig,

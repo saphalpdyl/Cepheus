@@ -23,6 +23,8 @@ type Supervisor struct {
 	logger *slog.Logger
 
 	executors map[api.AgentTaskType]Executor
+
+	probeDataStream chan api.ProbeResult
 }
 
 type SupervisorConfig struct {
@@ -30,6 +32,8 @@ type SupervisorConfig struct {
 	Ctx       context.Context
 	Logger    *slog.Logger
 	Executors map[api.AgentTaskType]Executor
+
+	ProbeDataStream chan api.ProbeResult
 }
 
 func NewSupervisor(cfg SupervisorConfig) *Supervisor {
@@ -42,7 +46,8 @@ func NewSupervisor(cfg SupervisorConfig) *Supervisor {
 		desired: make(map[string]api.Task),
 		logger:  cfg.Logger,
 
-		executors: cfg.Executors,
+		executors:       cfg.Executors,
+		probeDataStream: cfg.ProbeDataStream,
 	}
 }
 
@@ -84,6 +89,10 @@ func (s *Supervisor) startTaskLoop(ctx context.Context, rt *RunningTask) {
 		if err != nil {
 			s.logger.ErrorContext(ctx, "error executing probe task", log.Err(err), "task_id", rt.Spec.TaskID)
 		}
+
+		// Send to probe channel
+		// TODO: This may block when probeDataBuffer is full
+		s.probeDataStream <- res
 
 		// TODO: ProbeResult should be fed into the probeDataBuffer chan
 		data, err := json.Marshal(res)
