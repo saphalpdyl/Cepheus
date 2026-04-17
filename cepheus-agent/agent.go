@@ -108,6 +108,11 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	}()
 
 	<-ctx.Done()
+	err = scamper.Stop()
+	if err != nil {
+		a.logger.ErrorContext(ctx, "failed to stop scamper", log.Err(err))
+	}
+
 	return nil
 }
 

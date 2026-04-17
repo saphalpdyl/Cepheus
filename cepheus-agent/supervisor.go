@@ -41,7 +41,7 @@ func NewSupervisor(cfg SupervisorConfig) *Supervisor {
 }
 
 func (s *Supervisor) startTask(spec *api.Task) *RunningTask {
-	_, cancel := context.WithCancel(s.ctx)
+	ctx, cancel := context.WithCancel(s.ctx)
 	done := make(chan struct{})
 
 	rt := &RunningTask{
@@ -54,9 +54,8 @@ func (s *Supervisor) startTask(spec *api.Task) *RunningTask {
 
 	go func() {
 		defer close(done)
+		s.startTaskLoop(ctx, rt)
 	}()
-
-	go s.startTaskLoop(s.ctx, rt)
 
 	return rt
 }
@@ -93,35 +92,55 @@ func (s *Supervisor) startTaskLoop(ctx context.Context, rt *RunningTask) {
 		case <-ticker.C:
 			// Next cycle
 		case <-ctx.Done():
+			s.logger.InfoContext(ctx, "closing task loop", "task_id", rt.Spec.TaskID)
 			return
 		}
 	}
 }
 
 func (s *Supervisor) SetDesiredTasks(tasks []api.Task) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	desired := make(map[string]api.Task, len(tasks))
 	for _, t := range tasks {
 		desired[t.TaskID] = t
 	}
+
+	s.mu.Lock()
 	s.desired = desired
+	s.mu.Unlock()
 
 	s.logger.InfoContext(s.ctx, "Reconcilation starting...")
 	s.reconcile(s.ctx)
 }
 
 func (s *Supervisor) reconcile(ctx context.Context) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// Stop removed tasks
-	for id, _ := range s.running {
+	toStop := make([]*RunningTask, 0, len(s.running))
+
+	for id, running := range s.running {
 		if _, ok := s.desired[id]; !ok {
-			// running.Stop()
-			// delete(s.running, id)
+			toStop = append(toStop, running)
 		}
 	}
 
-	s.logger.InfoContext(ctx, "finished removing undesired tasks")
+	var wg sync.WaitGroup
+	wg.Add(len(toStop))
+	for _, rt := range toStop {
+		go func() {
+			defer wg.Done()
+			rt.Stop()
+		}()
+	}
+	wg.Wait()
+
+	for _, rt := range toStop {
+		delete(s.running, rt.Spec.TaskID)
+	}
+
+	s.logger.InfoContext(ctx, "finished removing undesired tasks", "task_count", len(toStop))
 
 	for id, desired := range s.desired {
 		running, exists := s.running[id]
@@ -138,5 +157,9 @@ func (s *Supervisor) reconcile(ctx context.Context) {
 		}
 
 		// Generation changed — decide: hot update or restart
+		// just restart for now
+		running.Stop()
+		newRt := s.startTask(&desired)
+		s.running[id] = newRt
 	}
 }
