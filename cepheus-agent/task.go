@@ -1,7 +1,7 @@
 package cepheusagent
 
 import (
-	"cepheus/pkg/api"
+	"cepheus/api"
 	"context"
 	"time"
 )

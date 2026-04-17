@@ -39,9 +39,9 @@ const (
 
 type AgentTaskTraceParams struct {
 	Target      string           `json:"target"`
-	SourceIP    string           `json:"source_ip,omitempty"`
-	Method      TraceProbeMethod `json:"method"`
-	MaxTTL      int              `json:"max_ttl,omitempty"`
+	SourceIP string           `json:"source_ip,omitempty"`
+	Method   TraceProbeMethod `json:"method"`
+	MaxTTL   int              `json:"max_ttl,omitempty"`
 	FirstTTL    int              `json:"first_ttl,omitempty"`
 	Dscp        int              `json:"dscp,omitempty"`
 	WaitSeconds int              `json:"wait_seconds,omitempty"`
@@ -64,8 +64,8 @@ const (
 )
 
 type AgentTaskStampParams struct {
-	Mode             StampMode `json:"mode"`
-	Target           string    `json:"target"`
+	Mode   StampMode `json:"mode"`
+	Target string    `json:"target"`
 	TargetPort       int       `json:"target_port"`
 	SourceIP         string    `json:"source_ip,omitempty"`
 	Dscp             int       `json:"dscp,omitempty"`
@@ -73,12 +73,12 @@ type AgentTaskStampParams struct {
 }
 
 type Task struct {
-	TaskID     string            `json:"task_id"`
-	Type       AgentTaskType     `json:"type"`
-	Enabled    bool              `json:"enabled"`
+	TaskID   string            `json:"task_id"`
+	Type     AgentTaskType     `json:"type"`
+	Enabled  bool              `json:"enabled"`
 	Generation int               `json:"generation"`
-	Params     json.RawMessage   `json:"params"`
-	Schedule   AgentTaskSchedule `json:"schedule"`
+	Params   json.RawMessage   `json:"params"`
+	Schedule AgentTaskSchedule `json:"schedule"`
 }
 
 func (t *Task) ParseParams() (interface{}, error) {
