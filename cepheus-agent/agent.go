@@ -39,6 +39,8 @@ type Agent struct {
 	scamperBinPath string
 
 	logger *slog.Logger
+
+	httpClient *http.Client
 }
 
 type AgentInitConfig struct {
@@ -189,7 +191,13 @@ func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig,
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	if a.httpClient == nil {
+		a.httpClient = &http.Client{
+			Timeout: 10 * time.Second,
+		}
+	}
+
+	resp, err := a.httpClient.Do(req)
 	if err != nil {
 		a.logger.Error("failed to fetch configuration", log.Err(err))
 		return nil, err
@@ -213,6 +221,6 @@ func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig,
 		return nil, err
 	}
 
-	a.logger.Info("configuration pulled", "serial_id", a.SerialId)
+	a.logger.Info("configuration pulled", "serial_id", a.SerialId, "configuration", string(body))
 	return &configResult, nil
 }

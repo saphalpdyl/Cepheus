@@ -97,7 +97,7 @@ func NewSender(cfg SenderConfig) (*Sender, error) {
 // HMACKey is set.
 func (s *Sender) Send() (*ReflectorPacket, error) {
 	if s.HMACKey != nil {
-		panic("not implemented")
+		return nil, fmt.Errorf("HMAC authentication is not yet implemented")
 	}
 
 	timestamp, err := NewTimestamp(TimestampParams{
@@ -160,5 +160,6 @@ func (s *Sender) Close() error {
 	if s.Conn == nil {
 		return nil
 	}
+	s.Conn.SetReadDeadline(time.Now())
 	return s.Conn.Close()
 }

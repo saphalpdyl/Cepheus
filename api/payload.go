@@ -23,8 +23,9 @@ const (
 // -------------------------------
 
 type AgentTaskSchedule struct {
-	IntervalSeconds int `json:"interval_seconds"`
-	JitterPercent   int `json:"jitter_percent"`
+	Enabled         bool `json:"enabled"`
+	IntervalSeconds int  `json:"interval_seconds"`
+	JitterPercent   int  `json:"jitter_percent"`
 }
 
 type AgentTaskPingParams struct {

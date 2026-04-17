@@ -41,6 +41,10 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 	}
 	defer sender.Close()
 
+	go func() {
+		<-ctx.Done()
+	}()
+
 	count := p.PacketCount
 	if count <= 0 {
 		count = 10
@@ -55,7 +59,11 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 
 	for i := 0; i < count; i++ {
 		if ctx.Err() != nil {
-			return api.ProbeResult{}, ctx.Err()
+			// Compute from whatever we have collected, sent >= half of Packetcount
+			if sent < (p.PacketCount / 2) {
+				return api.ProbeResult{}, nil
+			}
+			return computeProbeResult(rtts, spec, sent, p), ctx.Err()
 		}
 
 		pkt, err := sender.Send()
@@ -81,6 +89,10 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 		}
 	}
 
+	return computeProbeResult(rtts, spec, sent, p), nil
+}
+
+func computeProbeResult(rtts []time.Duration, spec *api.Task, sent int, p *api.AgentTaskStampSenderParams) api.ProbeResult {
 	stats := computeRTTStats(rtts)
 	return api.ProbeResult{
 		TaskID:    spec.TaskID,
@@ -98,7 +110,7 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 			"p50_rtt":  stats.P50,
 			"p95_rtt":  stats.P95,
 		},
-	}, nil
+	}
 }
 
 func computeRTT(pkt *stamp.ReflectorPacket, t4 time.Time, clockFormat stamp.TimestampClockFormat) (*time.Duration, error) {

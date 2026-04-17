@@ -27,7 +27,7 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 		        c.report_endpoint, c.report_batch_size, c.report_interval_seconds,
 		        EXTRACT(EPOCH FROM c.updated_at)::bigint,
 		        t.task_id, t.type, t.enabled, t.generation, t.params,
-		        t.schedule_interval_seconds, t.schedule_jitter_percent
+		        t.schedule_interval_seconds, t.schedule_jitter_percent, schedule_enabled
 		 FROM device d
 		 JOIN agent_config c ON c.id = d.agent_config_id
 		 LEFT JOIN agent_task t ON t.agent_config_id = c.id
@@ -51,13 +51,14 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 		var taskParams *json.RawMessage
 		var scheduleInterval *int
 		var scheduleJitter *int
+		var scheduleEnabled *bool
 
 		if err = rows.Scan(
 			&cfg.ID, &cfg.Generation,
 			&cfg.ReportEndpoint, &cfg.ReportBatchSize, &cfg.ReportIntervalSeconds,
 			&cfg.UpdatedAt,
 			&taskID, &taskType, &taskEnabled, &taskGeneration, &taskParams,
-			&scheduleInterval, &scheduleJitter,
+			&scheduleInterval, &scheduleJitter, &scheduleEnabled,
 		); err != nil {
 			log().Error("scan failed", "serial_id", serialID, logattr.Err(err))
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("scan failed: %v", err))
@@ -81,6 +82,9 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 			}
 			if scheduleJitter != nil {
 				task.Schedule.JitterPercent = *scheduleJitter
+			}
+			if scheduleEnabled != nil {
+				task.Schedule.Enabled = *scheduleEnabled
 			}
 			cfg.Tasks = append(cfg.Tasks, task)
 		}
