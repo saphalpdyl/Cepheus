@@ -196,6 +196,7 @@ func (s *Supervisor) reconcile(ctx context.Context) {
 
 		// Generation changed — decide: hot update or restart
 		// just restart for now
+		s.logger.InfoContext(ctx, "restarting task", "task_id", running.Spec.TaskID)
 		running.Stop()
 		newRt := s.startTask(&desired)
 		s.running[id] = newRt

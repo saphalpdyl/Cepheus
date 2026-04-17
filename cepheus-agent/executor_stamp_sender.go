@@ -32,7 +32,7 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 	sender, err := stamp.NewSender(stamp.SenderConfig{
 		LocalAddr:  p.SourceIP,
 		RemoteAddr: net.JoinHostPort(p.Target, strconv.Itoa(int(p.TargetPort))),
-		Timeout:    time.Duration(10) * time.Second,
+		Timeout:    time.Duration(1) * time.Second,
 		Config:     e.stampConfig,
 		OnError:    func(err error) { e.logger.ErrorContext(ctx, "stamp sender error", "err", err) },
 	})
