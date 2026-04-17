@@ -22,7 +22,7 @@ func NewStampReflectorExecutor(stampCfg stamp.Config, logger *slog.Logger) *Stam
 	}
 }
 
-func (e *StampReflectorExecutor) Execute(ctx context.Context, params api.TaskParams) (api.ProbeResult, error) {
+func (e *StampReflectorExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (api.ProbeResult, error) {
 
 	p, ok := params.(*api.AgentTaskStampReflectorParams)
 	if !ok {

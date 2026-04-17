@@ -23,7 +23,7 @@ func NewStampSenderExecutor(stampCfg stamp.Config, logger *slog.Logger) *StampSe
 	}
 }
 
-func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams) (api.ProbeResult, error) {
+func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (api.ProbeResult, error) {
 	p, ok := params.(*api.AgentTaskStampSenderParams)
 	if !ok {
 		return api.ProbeResult{}, fmt.Errorf("stamp-sender: expected AgentTaskStampSenderParams, got %T", params)
@@ -83,7 +83,8 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 
 	stats := computeRTTStats(rtts)
 	return api.ProbeResult{
-		Kind:      "stamp-sender",
+		TaskID:    spec.TaskID,
+		Kind:      string(spec.Type),
 		Timestamp: time.Now(),
 		Data: map[string]any{
 			"target":   p.Target,

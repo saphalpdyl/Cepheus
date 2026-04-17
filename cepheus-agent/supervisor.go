@@ -80,7 +80,7 @@ func (s *Supervisor) startTaskLoop(ctx context.Context, rt *RunningTask) {
 			s.logger.ErrorContext(ctx, "error parsing param for task", "task_id", rt.Spec.TaskID)
 		}
 
-		res, err := s.executors[rt.Spec.Type].Execute(ctx, params)
+		res, err := s.executors[rt.Spec.Type].Execute(ctx, params, rt.Spec)
 		if err != nil {
 			s.logger.ErrorContext(ctx, "error executing probe task", log.Err(err), "task_id", rt.Spec.TaskID)
 		}

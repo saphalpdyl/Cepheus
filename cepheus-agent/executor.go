@@ -6,5 +6,5 @@ import (
 )
 
 type Executor interface {
-	Execute(ctx context.Context, params api.TaskParams) (api.ProbeResult, error)
+	Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (api.ProbeResult, error)
 }
