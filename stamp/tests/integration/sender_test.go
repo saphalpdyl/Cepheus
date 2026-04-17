@@ -1,9 +1,9 @@
 //go:build integration
 
-package cepheusstamp_test
+package integration_test
 
 import (
-	"cepheus/pkg/cepheusstamp"
+	cepheusstamp2 "cepheus/stamp"
 	"encoding/json"
 	"log"
 	"testing"
@@ -12,15 +12,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var config cepheusstamp.Config
+var config cepheusstamp2.Config
 
 func TestMain(m *testing.M) {
-	config = cepheusstamp.Config{
-		ErrorEstimate: cepheusstamp.ErrorEstimateConfig{
+	config = cepheusstamp2.Config{
+		ErrorEstimate: cepheusstamp2.ErrorEstimateConfig{
 			Scale:        22,
 			Multiplier:   1,
 			Synchronized: true,
-			ClockFormat:  cepheusstamp.ClockFormatNTP,
+			ClockFormat:  cepheusstamp2.ClockFormatNTP,
 		},
 	}
 
@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 
 func Test_SendNormalPkt(t *testing.T) {
 	t.Run("send normal packet", func(t *testing.T) {
-		senderConfig := cepheusstamp.SenderConfig{
+		senderConfig := cepheusstamp2.SenderConfig{
 			Config:     config,
 			LocalAddr:  "localhost:50023",
 			RemoteAddr: "localhost:862",
@@ -39,7 +39,7 @@ func Test_SendNormalPkt(t *testing.T) {
 				t.Logf("error %v", err)
 			},
 		}
-		sender, err := cepheusstamp.NewSender(senderConfig)
+		sender, err := cepheusstamp2.NewSender(senderConfig)
 		if err != nil {
 			t.Fatalf("failed to create sender: %v", err)
 		}

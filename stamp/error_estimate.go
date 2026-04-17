@@ -1,4 +1,4 @@
-package cepheusstamp
+package stamp
 
 import "errors"
 

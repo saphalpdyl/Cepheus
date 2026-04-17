@@ -41,5 +41,5 @@ test.build:
 
 test.integration: test.build
 	docker compose -f docker-compose.test.yaml up -d
-	go test -v -tags integration ./pkg/cepheusstamp/tests/integration
+	go test -v -tags integration ./stamp/tests/integration
 	docker compose -f docker-compose.test.yaml down

@@ -1,4 +1,4 @@
-package cepheusstamp
+package stamp
 
 type ErrorEstimateConfig struct {
 	Scale        uint8
