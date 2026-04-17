@@ -54,7 +54,7 @@ func Test_SendNormalPkt(t *testing.T) {
 			t.Fatalf("failed to marshal response: %v", err)
 		}
 
-		t.Logf("got response: %s", responseM)
+		t.Logf("got response: %s", string(responseM))
 
 		// timestamp sequence
 		// session-sender timestamp < recieve-timestamp < timestamp RFC 8762§4.3.1

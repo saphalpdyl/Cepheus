@@ -1,6 +1,8 @@
 package stamp
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 )
@@ -57,7 +59,7 @@ func NewReflector(cfg ReflectorConfig) (*Reflector, error) {
 
 // Serve runs the reflector loop until the underlying connection is closed.
 // Each received packet is reflected back to its sender.
-func (r *Reflector) Serve() error {
+func (r *Reflector) Serve(ctx context.Context) error {
 	udpServer, err := net.ListenPacket("udp", r.LocalAddr)
 	if err != nil {
 		return err
@@ -68,9 +70,30 @@ func (r *Reflector) Serve() error {
 	r.Server = &udpServer
 
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
 		buf := make([]byte, 1500)
 		readBytes, addr, err := udpServer.ReadFrom(buf)
+
 		if err != nil {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
+
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			if errors.Is(err, net.ErrClosed) {
+				return nil // Return because this means that the socket was externally closed; irrecoverable
+			}
+
 			r.handleError(err)
 			continue
 		}
@@ -148,8 +171,8 @@ func (r *Reflector) handleError(err error) {
 }
 
 func (r *Reflector) Close() error {
-	if r.Server == nil {
-		return nil
+	if r.Server != nil && *r.Server != nil {
+		return (*r.Server).Close()
 	}
-	return (*r.Server).Close()
+	return nil
 }

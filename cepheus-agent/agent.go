@@ -3,6 +3,7 @@ package cepheusagent
 import (
 	"cepheus/api"
 	"cepheus/cepheus-agent/log"
+	"cepheus/stamp"
 	"cepheus/telemetry"
 	"context"
 	"encoding/json"
@@ -77,10 +78,30 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		return err
 	}
 
+	// TODO: TEMP stuff
+	stampConfig := stamp.Config{
+		ErrorEstimate: stamp.ErrorEstimateConfig{
+			ClockFormat:  stamp.ClockFormatNTP,
+			Multiplier:   1,
+			Scale:        22,
+			Synchronized: true,
+		},
+	}
+
 	supervisor := NewSupervisor(SupervisorConfig{
 		Ctx:     ctx,
 		Scamper: scamper,
 		Logger:  a.logger,
+		Executors: map[api.AgentTaskType]Executor{
+			api.TaskTypeStampSender: NewStampSenderExecutor(
+				stampConfig,
+				a.logger.With(log.Domain(log.DomainProbeExecutor), slog.String("executor", string(api.TaskTypeStampSender))),
+			),
+			api.TaskTypeStampReflector: NewStampReflectorExecutor(
+				stampConfig,
+				a.logger.With(log.Domain(log.DomainProbeExecutor), slog.String("executor", string(api.TaskTypeStampReflector))),
+			),
+		},
 	})
 
 	a.logger.InfoContext(ctx, "started supervisor")

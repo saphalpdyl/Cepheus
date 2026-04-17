@@ -2,8 +2,9 @@ package cepheusagent
 
 import (
 	"cepheus/api"
+	"cepheus/cepheus-agent/log"
 	"context"
-	"fmt"
+	"encoding/json"
 	"log/slog"
 	"sync"
 	"time"
@@ -20,12 +21,15 @@ type Supervisor struct {
 	ctx context.Context
 
 	logger *slog.Logger
+
+	executors map[api.AgentTaskType]Executor
 }
 
 type SupervisorConfig struct {
-	Scamper *Scamper
-	Ctx     context.Context
-	Logger  *slog.Logger
+	Scamper   *Scamper
+	Ctx       context.Context
+	Logger    *slog.Logger
+	Executors map[api.AgentTaskType]Executor
 }
 
 func NewSupervisor(cfg SupervisorConfig) *Supervisor {
@@ -37,6 +41,8 @@ func NewSupervisor(cfg SupervisorConfig) *Supervisor {
 		running: make(map[string]*RunningTask),
 		desired: make(map[string]api.Task),
 		logger:  cfg.Logger,
+
+		executors: cfg.Executors,
 	}
 }
 
@@ -67,33 +73,65 @@ func (s *Supervisor) startTaskLoop(ctx context.Context, rt *RunningTask) {
 		return
 	}
 
+	// TODO: Extract this to a manageable place
+	executeTask := func() {
+		params, err := rt.Spec.ParseParams()
+		if err != nil {
+			s.logger.ErrorContext(ctx, "error parsing param for task", "task_id", rt.Spec.TaskID)
+		}
+
+		res, err := s.executors[rt.Spec.Type].Execute(ctx, params)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "error executing probe task", log.Err(err), "task_id", rt.Spec.TaskID)
+		}
+
+		// TODO: ProbeResult should be fed into the probeDataBuffer chan
+		data, err := json.Marshal(res)
+		s.logger.InfoContext(ctx, "probe result", "result", string(data))
+	}
+
 	interval := time.Duration(rt.Spec.Schedule.IntervalSeconds) * time.Second
-	if interval <= 0 {
+	if interval < 0 {
 		s.logger.ErrorContext(ctx, "interval less than zero", "interval", interval.Seconds(), "interval_raw", rt.Spec.Schedule.IntervalSeconds)
 		return
-	}
-
-	jitter := computeJitter(interval, rt.Spec.Schedule.JitterPercent)
-
-	select {
-	case <-time.After(jitter):
-	case <-ctx.Done():
-		return
-	}
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		// execute here
-		s.logger.InfoContext(ctx, fmt.Sprintf("executed probe task: %s", rt.Spec.TaskID), "task_id", rt.Spec.TaskID)
+	} else if rt.Spec.Schedule.IntervalSeconds == 0 {
+		// TODO: Very ugly compare here, interval=0 && jitterperc=0 meaning non-interval task
+		// TODO: Change to Daemon mode, or non-interval mode flag
+		if rt.Spec.Schedule.JitterPercent != 0 {
+			s.logger.ErrorContext(ctx, "interval less than zero", "interval", interval.Seconds(), "interval_raw", rt.Spec.Schedule.IntervalSeconds)
+			return
+		}
 
 		select {
-		case <-ticker.C:
-			// Next cycle
 		case <-ctx.Done():
-			s.logger.InfoContext(ctx, "closing task loop", "task_id", rt.Spec.TaskID)
 			return
+		default:
+			executeTask()
+		}
+		return
+	} else {
+		// Interval-based task
+		jitter := computeJitter(interval, rt.Spec.Schedule.JitterPercent)
+
+		select {
+		case <-time.After(jitter):
+		case <-ctx.Done():
+			return
+		}
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			executeTask()
+
+			select {
+			case <-ticker.C:
+				// Next cycle
+			case <-ctx.Done():
+				s.logger.InfoContext(ctx, "closing task loop", "task_id", rt.Spec.TaskID)
+				return
+			}
 		}
 	}
 }

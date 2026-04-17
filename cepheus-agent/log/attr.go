@@ -17,6 +17,7 @@ type LogDomain string
 const (
 	DomainAgentLifecycle  LogDomain = "AGENT_LIFECYCLE"
 	DomainAgentSupervisor LogDomain = "AGENT_SUPERVISOR"
+	DomainProbeExecutor   LogDomain = "PROBE_EXECUTOR"
 )
 
 // ── Domain/Context ────────────────────────────────────────────────────────────
