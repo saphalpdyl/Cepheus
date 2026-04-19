@@ -1,5 +1,14 @@
 package scamper
 
+type ScamperClientConfig struct {
+	BinPath    string
+	SocketPath string
+	PPS        uint32
+	Window     uint32
+
+	Format ScamperFormat
+}
+
 type ScamperFormat string
 
 const (
@@ -8,18 +17,41 @@ const (
 	ScamperFormatText  ScamperFormat = "text"
 )
 
+type ScamperResult interface {
+	ScamperResult()
+}
+
+// === Error results ===
+type ErrorResult struct {
+	Err     error
+	Message string
+}
+
+// === Error results ===
+
+// === Any results ===
+type ReaderResult struct {
+	// internal
+	Data []byte
+}
+
+// === Any results ===
+
+// === Traceroute results ===
 type TraceHop struct {
-	Addr string  `json:"addr"`
-	RTT  float64 `json:"rtt"`
-	TTL  int     `json:"probe_ttl"`
+	Addr string
+	RTT  float64
+	TTL  int
 }
 
 type TraceResult struct {
-	Type string     `json:"type"`
-	Src  string     `json:"src"`
-	Dst  string     `json:"dst"`
-	Hops []TraceHop `json:"hops"`
+	Type string
+	Src  string
+	Dst  string
+	Hops []TraceHop
 }
+
+func (t *TraceResult) ScamperResult() {}
 
 func (h *TraceHop) ToMap() map[string]any {
 	return map[string]any{
@@ -41,3 +73,5 @@ func (r *TraceResult) ToMap() map[string]any {
 		"hops": hops,
 	}
 }
+
+// === Traceroute results ===

@@ -5,3 +5,16 @@ services:
     ports:
       - "862:862/udp"
     command: "./target/release/stamp-suite -i"
+
+  scamper-test-suite:
+    image: test-scamper-suite:latest
+    container_name: cepheus-test-scamper-scamper-suite
+    network_mode: host
+    privileged: true
+    volumes:
+      - type: bind
+        source: ./dist/cepheus-agent/
+        target: /opt/cepheus-agent/
+      - type: bind
+        source: .
+        target: /app

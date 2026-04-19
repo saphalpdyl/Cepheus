@@ -1,4 +1,4 @@
-// This package provides a multiplexed attach-mode client for the
+// This package provides a multiplexed client for the
 // scamper network measurement daemon, communicating over a Unix domain
 // or TCP control socket.
 //

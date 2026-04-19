@@ -38,8 +38,11 @@ apply: clean build-vm
 # Tests
 test.build:
 	docker build -t test-stamp-suite:latest -f docker/tests/stamp.test.Dockerfile .
+	docker build -t test-scamper-suite:latest -f docker/tests/scamper.test.Dockerfile .
+	docker build --output type=local,dest=dist/ -f docker/scamper.build.Dockerfile .
 
 test.integration: test.build
 	docker compose -f docker-compose.test.yaml up -d
 	go test -v -tags integration ./stamp/tests/integration
+	docker compose -f docker-compose.test.yaml exec scamper-test-suite go test -v -tags integration /app/scamper/tests/integration
 	docker compose -f docker-compose.test.yaml down
