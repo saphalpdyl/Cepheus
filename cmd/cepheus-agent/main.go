@@ -92,7 +92,7 @@ func main() {
 		LocalBufferSize:    100,
 		ControlPlaneConfig: cfg,
 		ScamperBinPath:     scamperBinPath,
-		Logger:             slog.Default().With(log.Domain(log.DomainAgentSupervisor)),
+		Logger:             slog.Default().With(log.Domain(log.DomainAgentSupervisor), log.SerialID(serialID)),
 	})
 	agent.Run(ctx)
 

@@ -9,7 +9,10 @@
 //	)
 package log
 
-import "log/slog"
+import (
+	"cepheus/api"
+	"log/slog"
+)
 
 type LogDomain string
 
@@ -18,6 +21,7 @@ const (
 	DomainAgentLifecycle  LogDomain = "AGENT_LIFECYCLE"
 	DomainAgentSupervisor LogDomain = "AGENT_SUPERVISOR"
 	DomainProbeExecutor   LogDomain = "PROBE_EXECUTOR"
+	DomainScamper         LogDomain = "SCAMPER"
 )
 
 // ── Domain/Context ────────────────────────────────────────────────────────────
@@ -25,7 +29,9 @@ func Domain(v LogDomain) slog.Attr { return slog.String("domain", string(v)) }
 
 // ── Identity ────────────────────────────────────────────────────────────
 
-func InstanceID(v string) slog.Attr { return slog.String("service.instance.id", v) }
+func InstanceID(v string) slog.Attr          { return slog.String("service.instance.id", v) }
+func SerialID(v string) slog.Attr            { return slog.String("serial_id", v) }
+func Executor(v api.AgentTaskType) slog.Attr { return slog.String("executor", string(v)) }
 
 // ── Operational ─────────────────────────────────────────────────────────
 

@@ -73,8 +73,12 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	scamper := NewScamper(a.scamperBinPath, a.agentConfig.ScamperPPS)
-	err = scamper.Start()
+	scamper := NewScamper(
+		a.scamperBinPath,
+		a.agentConfig.ScamperPPS,
+		a.logger.With(log.Domain(log.DomainScamper)),
+	)
+	err = scamper.Start(ctx)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "cannot start scamper", log.Err(err))
 		return err
@@ -98,11 +102,15 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		Executors: map[api.AgentTaskType]Executor{
 			api.TaskTypeStampSender: NewStampSenderExecutor(
 				stampConfig,
-				a.logger.With(log.Domain(log.DomainProbeExecutor), slog.String("executor", string(api.TaskTypeStampSender))),
+				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypeStampSender)),
 			),
 			api.TaskTypeStampReflector: NewStampReflectorExecutor(
 				stampConfig,
-				a.logger.With(log.Domain(log.DomainProbeExecutor), slog.String("executor", string(api.TaskTypeStampReflector))),
+				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypeStampReflector)),
+			),
+			api.TaskTypeTrace: NewTraceExecutor(
+				scamper,
+				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypeTrace)),
 			),
 		},
 	})

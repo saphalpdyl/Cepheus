@@ -2,8 +2,10 @@ package cepheusagent
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -20,24 +22,22 @@ type Scamper struct {
 	Conn       net.Conn
 	mu         sync.Mutex
 	scanner    *bufio.Scanner
-}
 
-type PingResult struct {
-	Type     string  `json:"type"`
-	Src      string  `json:"src"`
-	Dst      string  `json:"dst"`
-	PingMin  float64 `json:"min_rtt"`
-	PingMax  float64 `json:"max_rtt"`
-	PingAvg  float64 `json:"avg_rtt"`
-	Loss     float64 `json:"loss"`
-	Sent     int     `json:"probe_count"`
-	Received int     `json:"reply_count"`
+	logger *slog.Logger
 }
 
 type TraceHop struct {
 	Addr string  `json:"addr"`
 	RTT  float64 `json:"rtt"`
 	TTL  int     `json:"probe_ttl"`
+}
+
+func (h *TraceHop) ToMap() map[string]any {
+	return map[string]any{
+		"addr":      h.Addr,
+		"rtt":       h.RTT,
+		"probe_ttl": h.TTL,
+	}
 }
 
 type TraceResult struct {
@@ -47,24 +47,20 @@ type TraceResult struct {
 	Hops []TraceHop `json:"hops"`
 }
 
-type TracelbNode struct {
-	Addr string `json:"addr"`
+func (r *TraceResult) ToMap() map[string]any {
+	hops := make([]map[string]any, len(r.Hops))
+	for i := range r.Hops {
+		hops[i] = r.Hops[i].ToMap()
+	}
+	return map[string]any{
+		"type": r.Type,
+		"src":  r.Src,
+		"dst":  r.Dst,
+		"hops": hops,
+	}
 }
 
-type TracelbLink struct {
-	From int `json:"from"`
-	To   int `json:"to"`
-}
-
-type TracelbResult struct {
-	Type  string        `json:"type"`
-	Src   string        `json:"src"`
-	Dst   string        `json:"dst"`
-	Nodes []TracelbNode `json:"nodes"`
-	Links []TracelbLink `json:"links"`
-}
-
-func NewScamper(binPath string, pps int) *Scamper {
+func NewScamper(binPath string, pps int, logger *slog.Logger) *Scamper {
 	if pps == 0 {
 		pps = 100
 	}
@@ -72,14 +68,15 @@ func NewScamper(binPath string, pps int) *Scamper {
 		BinPath:    binPath,
 		SocketPath: "/tmp/scamper.sock",
 		PPS:        pps,
+		logger:     logger,
 	}
 }
 
-func (s *Scamper) Start() error {
+func (s *Scamper) Start(ctx context.Context) error {
 	// clean up stale socket
 	os.Remove(s.SocketPath)
 
-	s.Cmd = exec.Command(s.BinPath,
+	s.Cmd = exec.CommandContext(ctx, s.BinPath,
 		"-U", s.SocketPath,
 		"-p", fmt.Sprintf("%d", s.PPS),
 		"-O", "json",
@@ -90,6 +87,12 @@ func (s *Scamper) Start() error {
 
 	// wait for socket to appear
 	for i := 0; i < 20; i++ {
+		select {
+		case <-ctx.Done():
+			s.Cmd.Process.Kill()
+			return ctx.Err()
+		default:
+		}
 		if _, err := os.Stat(s.SocketPath); err == nil {
 			break
 		}
@@ -117,14 +120,31 @@ func (s *Scamper) Stop() error {
 	return nil
 }
 
-func (s *Scamper) send(command string) (json.RawMessage, error) {
+func (s *Scamper) send(ctx context.Context, command string) (json.RawMessage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Check context before sending
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	_, err := fmt.Fprintf(s.Conn, "%s\n", command)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send command: %w", err)
 	}
+
+	// Use a goroutine to unblock the scanner when the context is cancelled.
+	// Setting a read deadline on the connection causes scanner.Scan() to return.
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			s.Conn.SetReadDeadline(time.Now())
+		case <-done:
+		}
+	}()
 
 	// read lines until we get a JSON result
 	for s.scanner.Scan() {
@@ -133,36 +153,26 @@ func (s *Scamper) send(command string) (json.RawMessage, error) {
 			continue
 		}
 		if line[0] == '{' {
-			return json.RawMessage(line), nil
+			out := make([]byte, len(line))
+			copy(out, line)
+			s.Conn.SetReadDeadline(time.Time{})
+			return json.RawMessage(out), nil
 		}
+
+	}
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 	return nil, fmt.Errorf("connection closed before result")
 }
 
-func (s *Scamper) Ping(dst string, count int) (*PingResult, error) {
-	raw, err := s.send(fmt.Sprintf("ping -c %d %s", count, dst))
-	if err != nil {
-		return nil, err
-	}
-	var result PingResult
-	return &result, json.Unmarshal(raw, &result)
-}
-
-func (s *Scamper) Traceroute(dst string) (*TraceResult, error) {
-	raw, err := s.send(fmt.Sprintf("trace -P icmp-paris %s", dst))
+func (s *Scamper) Traceroute(ctx context.Context, dst string) (*TraceResult, error) {
+	raw, err := s.send(ctx, fmt.Sprintf("trace -P icmp-paris %s", dst))
 	if err != nil {
 		return nil, err
 	}
 	var result TraceResult
-	return &result, json.Unmarshal(raw, &result)
-}
-
-func (s *Scamper) Tracelb(dst string) (*TracelbResult, error) {
-	raw, err := s.send(fmt.Sprintf("tracelb %s", dst))
-	if err != nil {
-		return nil, err
-	}
-	var result TracelbResult
 	return &result, json.Unmarshal(raw, &result)
 }
 

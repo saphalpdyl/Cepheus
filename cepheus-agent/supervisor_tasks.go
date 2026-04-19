@@ -5,6 +5,7 @@ import (
 	"cepheus/cepheus-agent/log"
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -40,7 +41,13 @@ func (s *Supervisor) runOnce(ctx context.Context, rt *RunningTask) {
 		return
 	}
 
-	res, err := s.executors[rt.Spec.Type].Execute(ctx, params, rt.Spec)
+	executor, ok := s.executors[rt.Spec.Type]
+	if !ok {
+		s.logger.ErrorContext(ctx, fmt.Sprintf("executor for %s not found", rt.Spec.Type))
+		return
+	}
+
+	res, err := executor.Execute(ctx, params, rt.Spec)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "error executing probe task", log.Err(err), "task_id", rt.Spec.TaskID)
 		return
@@ -50,7 +57,12 @@ func (s *Supervisor) runOnce(ctx context.Context, rt *RunningTask) {
 	s.sendProbeToStream(ctx, res, rt)
 
 	data, err := json.Marshal(res)
-	s.logger.InfoContext(ctx, "probe result", "result", string(data))
+	if err != nil {
+		s.logger.ErrorContext(ctx, "couldn't marshal probe data", "task", rt.Spec.TaskID)
+		return
+	}
+
+	s.logger.InfoContext(ctx, fmt.Sprintf("probe result type %s", rt.Spec.Type), "result", string(data))
 }
 
 func (s *Supervisor) startTask(spec *api.Task) *RunningTask {

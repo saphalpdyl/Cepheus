@@ -7,6 +7,10 @@ INSERT INTO agent_task (agent_config_id, task_id, type, enabled, generation, sch
 VALUES ('cfg-ap1', 'stamp-to-sa', 'stamp-sender', true, 1, 10, 10, true, '{"target": "10.0.0.6", "target_port": 862, "dscp": 0, "require_clock_sync": false, "packet_count": 20, "packet_interval": 100000000}')
 ON CONFLICT DO NOTHING;
 
+INSERT INTO agent_task (agent_config_id, task_id, type, enabled, generation, schedule_interval_seconds, schedule_jitter_percent, schedule_enabled, params)
+VALUES ('cfg-ap1', 'trace-to-sa', 'trace', true, 1, 40, 10, true, '{"target": "1.1.1.1", "method": "icmp-paris"}')
+ON CONFLICT DO NOTHING;
+
 -- Reflector config
 INSERT INTO agent_config (id, generation, report_endpoint, report_batch_size, report_interval_seconds, scamper_pps)
 VALUES ('cfg-sa', 1, '/api/v1/devices/data/security-appliance', 10, 30, 100)
