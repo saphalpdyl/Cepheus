@@ -2,13 +2,14 @@ package cepheusagent
 
 import (
 	"cepheus/api"
+	goscamper "cepheus/scamper"
 	"context"
 	"log/slog"
 	"sync"
 )
 
 type Supervisor struct {
-	scamper *Scamper
+	scamper *goscamper.Scamper
 	mu      sync.RWMutex
 
 	tasks   map[string]api.Task
@@ -25,7 +26,7 @@ type Supervisor struct {
 }
 
 type SupervisorConfig struct {
-	Scamper   *Scamper
+	Scamper   *goscamper.Scamper
 	Ctx       context.Context
 	Logger    *slog.Logger
 	Executors map[api.AgentTaskType]Executor

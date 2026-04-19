@@ -3,6 +3,7 @@ package cepheusagent
 import (
 	"cepheus/api"
 	"cepheus/cepheus-agent/log"
+	goscamper "cepheus/scamper"
 	"cepheus/stamp"
 	"cepheus/telemetry"
 	"context"
@@ -73,7 +74,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	scamper := NewScamper(
+	scamper := goscamper.NewScamper(
 		a.scamperBinPath,
 		a.agentConfig.ScamperPPS,
 		a.logger.With(log.Domain(log.DomainScamper)),

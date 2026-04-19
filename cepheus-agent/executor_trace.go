@@ -3,6 +3,7 @@ package cepheusagent
 import (
 	"cepheus/api"
 	"cepheus/cepheus-agent/log"
+	goscamper "cepheus/scamper"
 	"context"
 	"fmt"
 	"log/slog"
@@ -10,12 +11,12 @@ import (
 )
 
 type TraceExecutor struct {
-	scamper *Scamper
+	scamper *goscamper.Scamper
 	logger  *slog.Logger
 }
 
 func NewTraceExecutor(
-	scamper *Scamper,
+	scamper *goscamper.Scamper,
 	logger *slog.Logger,
 ) *TraceExecutor {
 	return &TraceExecutor{

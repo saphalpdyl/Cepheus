@@ -1,4 +1,4 @@
-package cepheusagent
+package scamper
 
 import (
 	"bufio"
