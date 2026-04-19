@@ -1,24 +1,12 @@
 package scamper
 
-import (
-	"bufio"
-	"log/slog"
-	"net"
-	"os/exec"
-	"sync"
+type ScamperFormat string
+
+const (
+	ScamperFormatJSON  ScamperFormat = "json"
+	ScamperFormatWarts ScamperFormat = "warts"
+	ScamperFormatText  ScamperFormat = "text"
 )
-
-type Scamper struct {
-	BinPath    string
-	SocketPath string
-	PPS        int
-	Cmd        *exec.Cmd
-	Conn       net.Conn
-	mu         sync.Mutex
-	scanner    *bufio.Scanner
-
-	logger *slog.Logger
-}
 
 type TraceHop struct {
 	Addr string  `json:"addr"`

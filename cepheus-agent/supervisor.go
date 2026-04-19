@@ -9,7 +9,7 @@ import (
 )
 
 type Supervisor struct {
-	scamper *goscamper.Scamper
+	scamper *goscamper.ScamperClient
 	mu      sync.RWMutex
 
 	tasks   map[string]api.Task
@@ -26,7 +26,7 @@ type Supervisor struct {
 }
 
 type SupervisorConfig struct {
-	Scamper   *goscamper.Scamper
+	Scamper   *goscamper.ScamperClient
 	Ctx       context.Context
 	Logger    *slog.Logger
 	Executors map[api.AgentTaskType]Executor

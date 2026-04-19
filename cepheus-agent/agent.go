@@ -3,11 +3,13 @@ package cepheusagent
 import (
 	"cepheus/api"
 	"cepheus/cepheus-agent/log"
+	"cepheus/scamper"
 	goscamper "cepheus/scamper"
 	"cepheus/stamp"
 	"cepheus/telemetry"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -74,11 +76,23 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	scamper := goscamper.NewScamper(
-		a.scamperBinPath,
-		a.agentConfig.ScamperPPS,
-		a.logger.With(log.Domain(log.DomainScamper)),
+	scamper, err := goscamper.NewClient(
+		scamper.ScamperClientConfig{
+			BinPath: a.scamperBinPath,
+			PPS:     uint32(a.agentConfig.ScamperPPS),
+		},
 	)
+	if err != nil {
+		var scamperError goscamper.ConfigError
+		if errors.Is(err, &scamperError) {
+			a.logger.ErrorContext(ctx, err.Error())
+		} else {
+			a.logger.ErrorContext(ctx, "error initializing scamper client", log.Err(err))
+		}
+
+		return err
+	}
+
 	err = scamper.Start(ctx)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "cannot start scamper", log.Err(err))
