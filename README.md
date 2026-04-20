@@ -4,7 +4,7 @@ Modularized route health monitoring with software-based agents for managed netwo
 
 ### Table of Contents
 
-- [ROADMAP](/docs/roadmap.md)
+- [ROADMAP](/roadmap.md)
 - [Architecture](#architecture)
 - [Contributions](#contributions)
 - [Setup development environment](/docs/setup-dev.md)
