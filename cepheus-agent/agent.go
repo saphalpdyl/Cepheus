@@ -31,7 +31,7 @@ type Agent struct {
 	generation         int
 	controlPlaneConfig ControlPlaneConfig
 
-	probeDataStream chan api.ProbeResult
+	probeDataStream *ProbeDataStream
 
 	lastConfigurationPulled time.Time
 
@@ -48,7 +48,6 @@ type Agent struct {
 
 type AgentInitConfig struct {
 	SerialId           string
-	LocalBufferSize    int
 	ControlPlaneConfig ControlPlaneConfig
 	ScamperBinPath     string
 
@@ -59,10 +58,10 @@ func NewAgent(cfg AgentInitConfig) *Agent {
 	return &Agent{
 		SerialId:           cfg.SerialId,
 		generation:         0,
-		probeDataStream:    make(chan api.ProbeResult, cfg.LocalBufferSize), // TODO: Change to a defined type
 		controlPlaneConfig: cfg.ControlPlaneConfig,
 		logger:             cfg.Logger,
 		scamperBinPath:     cfg.ScamperBinPath,
+		probeDataStream:    NewProbeDataStream(100),
 	}
 }
 

@@ -22,7 +22,7 @@ type Supervisor struct {
 
 	executors map[api.AgentTaskType]Executor
 
-	probeDataStream chan api.ProbeResult
+	probeDataStream *ProbeDataStream
 }
 
 type SupervisorConfig struct {
@@ -31,7 +31,7 @@ type SupervisorConfig struct {
 	Logger    *slog.Logger
 	Executors map[api.AgentTaskType]Executor
 
-	ProbeDataStream chan api.ProbeResult
+	ProbeDataStream *ProbeDataStream
 }
 
 func NewSupervisor(cfg SupervisorConfig) *Supervisor {

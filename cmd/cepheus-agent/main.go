@@ -89,7 +89,6 @@ func main() {
 
 	agent := cepheusagent.NewAgent(cepheusagent.AgentInitConfig{
 		SerialId:           serialID,
-		LocalBufferSize:    100,
 		ControlPlaneConfig: cfg,
 		ScamperBinPath:     scamperBinPath,
 		Logger:             slog.Default().With(log.Domain(log.DomainAgentSupervisor), log.SerialID(serialID)),
