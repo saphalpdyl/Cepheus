@@ -32,6 +32,14 @@ services:
       - db
       - otel-collector
 
+  nats-server:
+    image: nats:2.12.7-scratch
+    container_name: cepheus-nats
+    ports:
+      - 4222:4222
+      - 8222:8222
+    command: ["--http_port", "8222", "-js", "-sd", "/data"]
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     volumes:

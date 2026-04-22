@@ -8,7 +8,7 @@ dev: build
 	docker compose up --build cepheus-server
 
 db:
-	docker compose up --build pgadmin db
+	docker compose up --build pgadmin db nats-server
 
 telemetry:
 	docker compose up otel-collector grafana loki tempo
