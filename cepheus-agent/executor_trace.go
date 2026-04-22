@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 )
 
 type TraceExecutor struct {
@@ -24,23 +25,28 @@ func NewTraceExecutor(
 }
 
 func (e *TraceExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (api.ProbeResult, error) {
-	_, ok := params.(*api.AgentTaskTraceParams)
+	p, ok := params.(*api.AgentTaskTraceParams)
 	if !ok {
 		return api.ProbeResult{}, fmt.Errorf("scamper-trace: expected AgentTaskTraceParams, got %T", params)
 	}
 
-	return api.ProbeResult{}, nil
+	resCh, err := e.scamper.Send(fmt.Sprintf("trace -P %s %s", string(p.Method), p.Target))
+	if err != nil {
+		return api.ProbeResult{}, fmt.Errorf("scamper-trace: failed to send trace command: %w", err)
+	}
 
-	// result, err := e.scamper.Traceroute(ctx, p.Target)
-	// if err != nil {
-	// 	e.logger.ErrorContext(ctx, "error with tracing", log.Err(err))
-	// 	return api.ProbeResult{}, err
-	// }
-
-	// return api.ProbeResult{
-	// 	TaskID:    spec.TaskID,
-	// 	Kind:      string(spec.Type),
-	// 	Timestamp: time.Now(),
-	// 	Data:      result.ToMap(),
-	// }, nil
+	select {
+	case <-ctx.Done():
+		return api.ProbeResult{}, fmt.Errorf("context cancelled")
+	case res := <-resCh:
+		return api.ProbeResult{
+			TaskID:    spec.TaskID,
+			Timestamp: time.Now(),
+			Kind:      string(spec.Type),
+			Data: map[string]any{
+				"method": string(p.Method),
+				"data":   res,
+			},
+		}, nil
+	}
 }

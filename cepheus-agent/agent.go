@@ -78,8 +78,10 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 
 	scamper, err := goscamper.NewClient(
 		scamper.ScamperClientConfig{
-			BinPath: a.scamperBinPath,
-			PPS:     uint32(a.agentConfig.ScamperPPS),
+			BinPath:    a.scamperBinPath,
+			SocketPath: "/tmp/scamper.sock",
+			PPS:        uint32(a.agentConfig.ScamperPPS),
+			Format:     goscamper.ScamperFormatJSON,
 		},
 	)
 	if err != nil {
