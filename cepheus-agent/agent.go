@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/avast/retry-go"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 // The control/management plane for cepheus-agent
@@ -74,6 +76,42 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		a.logger.ErrorContext(ctx, "failed to pull agent configuration", log.Err(err))
 		return err
 	}
+
+	// Dispatcher
+	nc, err := nats.Connect("nats://192.168.121.1:4222")
+	if err != nil {
+		a.logger.ErrorContext(ctx, "failed to connect to NATS server", log.Err(err))
+		return err
+	}
+
+	js, err := jetstream.New(nc)
+	if err != nil {
+		a.logger.ErrorContext(ctx, "failed to create a JetStream context", log.Err(err))
+		return err
+	}
+
+	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:        "BATCH_UPLOADS",
+		Description: "Stream used by agents to publish to NATS Jetstream server",
+		Subjects:    []string{"cepheus.probe.batch.upload"},
+	})
+
+	if err != nil {
+		a.logger.ErrorContext(ctx, "couldn't create or update stream", log.Err(err))
+	}
+
+	dispatcher := NewDispatcher(
+		a.probeDataStream,
+		a.logger.With(log.Domain(log.DomainDispatcher)),
+		10,
+		js,
+	)
+	err = dispatcher.Start(ctx, 15*time.Second) // TODO: hardcoded here change that
+	if err != nil {
+		a.logger.ErrorContext(ctx, "error starting dispatcher", log.Err(err))
+		return err
+	}
+	defer dispatcher.Stop()
 
 	scamper, err := goscamper.NewClient(
 		scamper.ScamperClientConfig{

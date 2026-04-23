@@ -33,7 +33,7 @@ func (p *ProbeDataStream) Insert(ctx context.Context, data api.ProbeResult) bool
 func (p *ProbeDataStream) Pull(ctx context.Context, n int) *[]api.ProbeResult {
 	buf := make([]api.ProbeResult, 0, n)
 
-	for i := 0; i < n; i++ {
+	for range n {
 		select {
 		case <-ctx.Done():
 			return nil

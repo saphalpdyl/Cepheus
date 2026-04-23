@@ -22,6 +22,7 @@ const (
 	DomainAgentSupervisor LogDomain = "AGENT_SUPERVISOR"
 	DomainProbeExecutor   LogDomain = "PROBE_EXECUTOR"
 	DomainScamper         LogDomain = "SCAMPER"
+	DomainDispatcher      LogDomain = "DISPATCHER"
 )
 
 // ── Domain/Context ────────────────────────────────────────────────────────────
