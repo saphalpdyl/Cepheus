@@ -78,7 +78,12 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	}
 
 	// Dispatcher
-	nc, err := nats.Connect(a.agentConfig.ReportEndpoint)
+	nc, err := nats.Connect(
+		a.agentConfig.ReportEndpoint,
+		nats.RetryOnFailedConnect(true),
+		nats.MaxReconnects(100),
+		nats.ReconnectWait(2*time.Second),
+	)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "failed to connect to NATS server", log.Err(err), "endpoint", a.agentConfig.ReportEndpoint)
 		return err
