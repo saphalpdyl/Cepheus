@@ -96,6 +96,7 @@ func computeProbeResult(rtts []time.Duration, spec *api.Task, sent int, p *api.A
 	stats := computeRTTStats(rtts)
 	return api.ProbeResult{
 		TaskID:    spec.TaskID,
+		ProbeType: api.ProbeTypeStamp,
 		Kind:      string(spec.Type),
 		Timestamp: time.Now(),
 		Data: map[string]any{

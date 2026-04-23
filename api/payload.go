@@ -20,6 +20,14 @@ const (
 	TaskTypePing           AgentTaskType = "ping"
 )
 
+// Used to differentiate data from different probes in dispatcher.go
+type ProbeType string
+
+const (
+	ProbeTypeStamp ProbeType = "stamp"
+	ProbeTypeTrace ProbeType = "trace"
+)
+
 // -------------------------------
 
 type AgentTaskSchedule struct {
@@ -156,6 +164,7 @@ type AgentConfig struct {
 
 type ProbeResult struct {
 	TaskID    string         `json:"task_id"`
+	ProbeType ProbeType      `json:"probe_type"`
 	Kind      string         `json:"kind"`
 	Timestamp time.Time      `json:"timestamp"`
 	Data      map[string]any `json:"data"`

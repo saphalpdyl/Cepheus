@@ -41,6 +41,7 @@ func (e *TraceExecutor) Execute(ctx context.Context, params api.TaskParams, spec
 	case res := <-resCh:
 		return api.ProbeResult{
 			TaskID:    spec.TaskID,
+			ProbeType: api.ProbeTypeTrace,
 			Timestamp: time.Now(),
 			Kind:      string(spec.Type),
 			Data: map[string]any{

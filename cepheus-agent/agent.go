@@ -80,7 +80,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	// Dispatcher
 	nc, err := nats.Connect(a.agentConfig.ReportEndpoint)
 	if err != nil {
-		a.logger.ErrorContext(ctx, "failed to connect to NATS server", log.Err(err))
+		a.logger.ErrorContext(ctx, "failed to connect to NATS server", log.Err(err), "endpoint", a.agentConfig.ReportEndpoint)
 		return err
 	}
 
@@ -91,9 +91,15 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	}
 
 	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
-		Name:        "BATCH_UPLOADS",
-		Description: "Stream used by agents to publish to NATS Jetstream server",
-		Subjects:    []string{"cepheus.probe.batch.upload"},
+		Name:        "PROBE_STAMP",
+		Description: "Stream for STAMP probe data",
+		Subjects:    []string{"cepheus.probe.stamp.>"},
+	})
+
+	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:        "PROBE_TRACE",
+		Description: "Stream for Trace probe data",
+		Subjects:    []string{"cepheus.probe.trace.>"},
 	})
 
 	if err != nil {
@@ -107,6 +113,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 			BatchSize:        10,
 			JetStream:        js,
 			JetStreamTimeout: time.Duration(a.agentConfig.ReportTimeoutSeconds) * time.Second,
+			SerialID:         a.SerialId,
 		},
 	)
 	err = dispatcher.Start(ctx, time.Duration(a.agentConfig.ReportTimeoutSeconds)*time.Second)
