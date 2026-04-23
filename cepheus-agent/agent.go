@@ -78,7 +78,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	}
 
 	// Dispatcher
-	nc, err := nats.Connect("nats://192.168.121.1:4222")
+	nc, err := nats.Connect(a.agentConfig.ReportEndpoint)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "failed to connect to NATS server", log.Err(err))
 		return err
@@ -101,12 +101,15 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	}
 
 	dispatcher := NewDispatcher(
-		a.probeDataStream,
-		a.logger.With(log.Domain(log.DomainDispatcher)),
-		10,
-		js,
+		DispatcherConfig{
+			ProbeDataStream:  a.probeDataStream,
+			Logger:           a.logger.With(log.Domain(log.DomainDispatcher)),
+			BatchSize:        10,
+			JetStream:        js,
+			JetStreamTimeout: time.Duration(a.agentConfig.ReportTimeoutSeconds) * time.Second,
+		},
 	)
-	err = dispatcher.Start(ctx, 15*time.Second) // TODO: hardcoded here change that
+	err = dispatcher.Start(ctx, time.Duration(a.agentConfig.ReportTimeoutSeconds)*time.Second)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "error starting dispatcher", log.Err(err))
 		return err

@@ -1,6 +1,6 @@
 -- Sender config
-INSERT INTO agent_config (id, generation, report_endpoint, report_batch_size, report_interval_seconds, scamper_pps)
-VALUES ('cfg-ap1', 1, '/api/v1/devices/data/ap1', 10, 30, 100)
+INSERT INTO agent_config (id, generation, report_endpoint, report_batch_size, report_interval_seconds, report_timeout_seconds, scamper_pps)
+VALUES ('cfg-ap1', 1, 'nats://localhost:4222', 10, 30, 10, 100)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO agent_task (agent_config_id, task_id, type, enabled, generation, schedule_interval_seconds, schedule_jitter_percent, schedule_enabled, params)
@@ -12,8 +12,8 @@ VALUES ('cfg-ap1', 'trace-to-sa', 'trace', true, 1, 40, 10, true, '{"target": "1
 ON CONFLICT DO NOTHING;
 
 -- Reflector config
-INSERT INTO agent_config (id, generation, report_endpoint, report_batch_size, report_interval_seconds, scamper_pps)
-VALUES ('cfg-sa', 1, '/api/v1/devices/data/security-appliance', 10, 30, 100)
+INSERT INTO agent_config (id, generation, report_endpoint, report_batch_size, report_interval_seconds, report_timeout_seconds, scamper_pps)
+VALUES ('cfg-sa', 1, 'nats://localhost:4222', 10, 30, 10, 100)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO agent_task (agent_config_id, task_id, type, enabled, generation, schedule_interval_seconds, schedule_jitter_percent, schedule_enabled, params)

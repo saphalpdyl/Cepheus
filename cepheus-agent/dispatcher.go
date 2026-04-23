@@ -1,5 +1,8 @@
 // dispatcher is responsible for batching telemetry data in supervisor's dataStream buffer
 // and send it to external message broker ( NATS in this case ) at regular intervals.
+
+// Dispatcher is greedy when batching, so if a batch fails and it retries, it will try
+// to fill the buffer until it fills.
 package cepheusagent
 
 import (
@@ -31,21 +34,27 @@ type Dispatcher struct {
 
 	// NATS JetStream
 	// no abstractions for now
-	js jetstream.JetStream
+	js        jetstream.JetStream
+	jsTimeout time.Duration
 }
 
-func NewDispatcher(
-	probeDataStream *ProbeDataStream,
-	logger *slog.Logger,
-	batchSize uint32,
-	jetStream jetstream.JetStream,
-) *Dispatcher {
+type DispatcherConfig struct {
+	ProbeDataStream *ProbeDataStream
+	Logger          *slog.Logger
+	BatchSize       uint32
+	JetStream       jetstream.JetStream
+
+	JetStreamTimeout time.Duration
+}
+
+func NewDispatcher(cfg DispatcherConfig) *Dispatcher {
 	return &Dispatcher{
-		probeDataStream: probeDataStream,
-		logger:          logger,
-		batchSize:       batchSize,
-		batchBuffer:     make([]api.ProbeResult, 0, batchSize),
-		js:              jetStream,
+		probeDataStream: cfg.ProbeDataStream,
+		logger:          cfg.Logger,
+		batchSize:       cfg.BatchSize,
+		js:              cfg.JetStream,
+		jsTimeout:       cfg.JetStreamTimeout,
+		batchBuffer:     make([]api.ProbeResult, cfg.BatchSize),
 	}
 }
 

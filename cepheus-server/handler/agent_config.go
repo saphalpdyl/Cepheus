@@ -24,7 +24,7 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.Pool.Query(ctx,
 		`SELECT c.id, c.generation,
-		        c.report_endpoint, c.report_batch_size, c.report_interval_seconds,
+		        c.report_endpoint, c.report_batch_size, c.report_interval_seconds, c.report_timeout_seconds,
 		        EXTRACT(EPOCH FROM c.updated_at)::bigint,
 		        t.task_id, t.type, t.enabled, t.generation, t.params,
 		        t.schedule_interval_seconds, t.schedule_jitter_percent, schedule_enabled
@@ -55,7 +55,7 @@ func (h *Handler) GetAgentConfig(w http.ResponseWriter, r *http.Request) {
 
 		if err = rows.Scan(
 			&cfg.ID, &cfg.Generation,
-			&cfg.ReportEndpoint, &cfg.ReportBatchSize, &cfg.ReportIntervalSeconds,
+			&cfg.ReportEndpoint, &cfg.ReportBatchSize, &cfg.ReportIntervalSeconds, &cfg.ReportTimeoutSeconds,
 			&cfg.UpdatedAt,
 			&taskID, &taskType, &taskEnabled, &taskGeneration, &taskParams,
 			&scheduleInterval, &scheduleJitter, &scheduleEnabled,

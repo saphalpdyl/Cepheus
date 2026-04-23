@@ -147,6 +147,7 @@ type AgentConfig struct {
 	ReportEndpoint        string          `json:"report_endpoint"`
 	ReportBatchSize       int             `json:"report_batch_size"`
 	ReportIntervalSeconds int             `json:"report_interval_seconds"`
+	ReportTimeoutSeconds  int             `json:"report_timeout_seconds"`
 	PendingActions        []PendingAction `json:"pending_actions"`
 	Tasks                 []Task          `json:"tasks"`
 	UpdatedAt             int             `json:"updated_at"`

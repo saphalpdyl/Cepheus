@@ -5,6 +5,7 @@ CREATE TABLE
         report_endpoint TEXT NOT NULL DEFAULT '',
         report_batch_size INT NOT NULL DEFAULT 1,
         report_interval_seconds INT NOT NULL DEFAULT 60,
+        report_timeout_seconds INT NOT NULL DEFAULT 10,
         scamper_pps INT NOT NULL DEFAULT 100,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW (),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW ()

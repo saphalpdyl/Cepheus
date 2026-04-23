@@ -22,8 +22,6 @@ func NewServer(listenAddr string, dbPool *pgxpool.Pool) *Server {
 	v1 := http.NewServeMux()
 
 	v1.HandleFunc("POST /devices/config/{serial_id}", h.GetAgentConfig)
-	v1.HandleFunc("POST /devices/data/{serial_id}", h.PostAgentData)
-	v1.HandleFunc("GET /devices/data/{serial_id}", h.GetAgentData)
 
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", v1))
 
