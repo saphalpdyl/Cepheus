@@ -2,6 +2,7 @@ package cepheusagent
 
 import (
 	"cepheus/api"
+	"cepheus/common"
 	"context"
 	"log/slog"
 )
@@ -31,7 +32,7 @@ func (p *ProbeDataStream) Insert(ctx context.Context, data api.ProbeResult) bool
 }
 
 func (p *ProbeDataStream) Pull(ctx context.Context, n int) *[]api.ProbeResult {
-	buf := make([]api.ProbeResult, 0, n)
+	buf := make([]common.ProbeResult, 0, n)
 
 	for range n {
 		select {

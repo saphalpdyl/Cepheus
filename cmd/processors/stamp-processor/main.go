@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cepheus/processors/shared/log"
 	stampprocessor "cepheus/processors/stamp-processor"
 	"cepheus/telemetry"
 	"context"
@@ -10,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 func main() {
@@ -43,7 +43,17 @@ func main() {
 
 	slog.InfoContext(ctx, "starting the processor")
 
-	time.Sleep(30 * time.Second)
+	processor := stampprocessor.NewStampProcessor(
+		serviceInstanceId,
+		config,
+		slog.Default().With(log.Domain(log.DomainProcessorLifecycle)),
+	)
+
+	err = processor.Start(ctx)
+
+	if err != nil {
+		slog.ErrorContext(ctx, "error while starting server", log.Err(err))
+	}
 
 	slog.InfoContext(ctx, "shutting down")
 

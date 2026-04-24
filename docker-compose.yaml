@@ -53,6 +53,8 @@ services:
     environment:
       - OTEL_SINK=otel
       - OTEL_ENDPOINT=otel-collector:4318
+      - "NATS_LISTEN_SUBJECT=cepheus.probe.stamp.*"
+      - NATS_LISTEN_URL=nats://nats-server:4222
 
   # ----- Our own stuff -----
 
