@@ -97,8 +97,8 @@ func (s *StampProcessor) Start(ctx context.Context) error {
 				continue
 			}
 
+			s.logger.InfoContext(ctx, fmt.Sprintf("fetched batch with %d messages", len(msgs.Messages())))
 			for msg := range msgs.Messages() {
-				s.logger.InfoContext(ctx, "consumed data", "data", msg.Data())
 
 				var payload common.ReportPayload
 				data := msg.Data()

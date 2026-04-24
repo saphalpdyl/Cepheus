@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cepheus/common"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -39,22 +40,14 @@ type AgentTaskPingParams struct {
 
 // -------------------------------
 
-type TraceProbeMethod string
-
-const (
-	TraceMethodICMPParis TraceProbeMethod = "icmp-paris"
-	TraceMethodUDPParis  TraceProbeMethod = "udp-paris"
-	TraceMethodTCP       TraceProbeMethod = "tcp"
-)
-
 type AgentTaskTraceParams struct {
-	Target      string           `json:"target"`
-	SourceIP    string           `json:"source_ip,omitempty"`
-	Method      TraceProbeMethod `json:"method"`
-	MaxTTL      int              `json:"max_ttl,omitempty"`
-	FirstTTL    int              `json:"first_ttl,omitempty"`
-	Dscp        int              `json:"dscp,omitempty"`
-	WaitSeconds int              `json:"wait_seconds,omitempty"`
+	Target      string                  `json:"target"`
+	SourceIP    string                  `json:"source_ip,omitempty"`
+	Method      common.TraceProbeMethod `json:"method"`
+	MaxTTL      int                     `json:"max_ttl,omitempty"`
+	FirstTTL    int                     `json:"first_ttl,omitempty"`
+	Dscp        int                     `json:"dscp,omitempty"`
+	WaitSeconds int                     `json:"wait_seconds,omitempty"`
 }
 
 // -------------------------------

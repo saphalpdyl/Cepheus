@@ -5,6 +5,7 @@ import (
 	"cepheus/common"
 	"cepheus/stamp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -95,23 +96,27 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 
 func computeProbeResult(rtts []time.Duration, spec *api.Task, sent int, p *api.AgentTaskStampSenderParams) common.ProbeResult {
 	stats := computeRTTStats(rtts)
+	data := common.StampData{
+		Target:   p.Target,
+		Port:     p.TargetPort,
+		Sent:     sent,
+		Received: len(rtts),
+		Loss:     float64(sent-len(rtts)) / float64(sent),
+		AvgRTT:   int64(stats.Avg),
+		MinRTT:   int64(stats.Min),
+		MaxRTT:   int64(stats.Max),
+		P50RTT:   int64(stats.P50),
+		P95RTT:   int64(stats.P95),
+	}
+
+	stampData, _ := json.Marshal(data)
+
 	return common.ProbeResult{
 		TaskID:    spec.TaskID,
 		ProbeType: common.ProbeTypeStamp,
 		Kind:      string(spec.Type),
 		Timestamp: time.Now(),
-		Data: map[string]any{
-			"target":   p.Target,
-			"port":     p.TargetPort,
-			"sent":     sent,
-			"received": len(rtts),
-			"loss":     float64(sent-len(rtts)) / float64(sent),
-			"avg_rtt":  stats.Avg,
-			"min_rtt":  stats.Min,
-			"max_rtt":  stats.Max,
-			"p50_rtt":  stats.P50,
-			"p95_rtt":  stats.P95,
-		},
+		Data:      stampData,
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"cepheus/common"
 	goscamper "cepheus/scamper"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -40,15 +41,26 @@ func (e *TraceExecutor) Execute(ctx context.Context, params api.TaskParams, spec
 	case <-ctx.Done():
 		return common.ProbeResult{}, fmt.Errorf("context cancelled")
 	case res := <-resCh:
+		data := common.TraceData{
+			Type:   common.TraceProbeTypeTrace, // TODO: This should be configurable
+			Method: p.Method,
+			Data:   res.Data,
+			Format: string(e.scamper.Format),
+		}
+
+		traceData, err := json.Marshal(data)
+
+		if err != nil {
+			e.logger.ErrorContext(ctx, "failed to marshal tarce probe data")
+			return common.ProbeResult{}, err
+		}
+
 		return common.ProbeResult{
 			TaskID:    spec.TaskID,
 			ProbeType: common.ProbeTypeTrace,
 			Timestamp: time.Now(),
 			Kind:      string(spec.Type),
-			Data: map[string]any{
-				"method": string(p.Method),
-				"data":   res,
-			},
+			Data:      traceData,
 		}, nil
 	}
 }
