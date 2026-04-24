@@ -3,7 +3,6 @@
 package cepheusagent
 
 import (
-	"cepheus/api"
 	"cepheus/cepheus-agent/log"
 	"cepheus/common"
 	"cepheus/telemetry"
@@ -86,9 +85,9 @@ func (d *Dispatcher) Start(ctx context.Context, interval time.Duration) (err err
 				var subject string
 
 				switch data.ProbeType {
-				case api.ProbeTypeStamp:
+				case common.ProbeTypeStamp:
 					subject = fmt.Sprintf("cepheus.probe.stamp.%s", d.SerialID)
-				case api.ProbeTypeTrace:
+				case common.ProbeTypeTrace:
 					subject = fmt.Sprintf("cepheus.probe.trace.%s", d.SerialID)
 				default:
 					d.logger.ErrorContext(ctx, fmt.Sprintf("invalid probe type, got %s", string(data.ProbeType)))

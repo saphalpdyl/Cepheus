@@ -2,6 +2,7 @@ package cepheusagent
 
 import (
 	"cepheus/api"
+	"cepheus/common"
 	goscamper "cepheus/scamper"
 	"context"
 	"fmt"
@@ -24,24 +25,24 @@ func NewTraceExecutor(
 	}
 }
 
-func (e *TraceExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (api.ProbeResult, error) {
+func (e *TraceExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (common.ProbeResult, error) {
 	p, ok := params.(*api.AgentTaskTraceParams)
 	if !ok {
-		return api.ProbeResult{}, fmt.Errorf("scamper-trace: expected AgentTaskTraceParams, got %T", params)
+		return common.ProbeResult{}, fmt.Errorf("scamper-trace: expected AgentTaskTraceParams, got %T", params)
 	}
 
 	resCh, err := e.scamper.Send(fmt.Sprintf("trace -P %s %s", string(p.Method), p.Target))
 	if err != nil {
-		return api.ProbeResult{}, fmt.Errorf("scamper-trace: failed to send trace command: %w", err)
+		return common.ProbeResult{}, fmt.Errorf("scamper-trace: failed to send trace command: %w", err)
 	}
 
 	select {
 	case <-ctx.Done():
-		return api.ProbeResult{}, fmt.Errorf("context cancelled")
+		return common.ProbeResult{}, fmt.Errorf("context cancelled")
 	case res := <-resCh:
-		return api.ProbeResult{
+		return common.ProbeResult{
 			TaskID:    spec.TaskID,
-			ProbeType: api.ProbeTypeTrace,
+			ProbeType: common.ProbeTypeTrace,
 			Timestamp: time.Now(),
 			Kind:      string(spec.Type),
 			Data: map[string]any{

@@ -1,25 +1,24 @@
 package cepheusagent
 
 import (
-	"cepheus/api"
 	"cepheus/common"
 	"context"
 	"log/slog"
 )
 
 type ProbeDataStream struct {
-	stream chan api.ProbeResult
+	stream chan common.ProbeResult
 
 	logger *slog.Logger
 }
 
 func NewProbeDataStream(streamSize uint32) *ProbeDataStream {
 	return &ProbeDataStream{
-		stream: make(chan api.ProbeResult, streamSize),
+		stream: make(chan common.ProbeResult, streamSize),
 	}
 }
 
-func (p *ProbeDataStream) Insert(ctx context.Context, data api.ProbeResult) bool {
+func (p *ProbeDataStream) Insert(ctx context.Context, data common.ProbeResult) bool {
 	select {
 	case p.stream <- data:
 		return true
@@ -31,7 +30,7 @@ func (p *ProbeDataStream) Insert(ctx context.Context, data api.ProbeResult) bool
 	}
 }
 
-func (p *ProbeDataStream) Pull(ctx context.Context, n int) *[]api.ProbeResult {
+func (p *ProbeDataStream) Pull(ctx context.Context, n int) *[]common.ProbeResult {
 	buf := make([]common.ProbeResult, 0, n)
 
 	for range n {

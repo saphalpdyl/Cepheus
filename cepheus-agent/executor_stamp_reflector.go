@@ -2,6 +2,7 @@ package cepheusagent
 
 import (
 	"cepheus/api"
+	"cepheus/common"
 	"cepheus/stamp"
 	"context"
 	"fmt"
@@ -22,11 +23,11 @@ func NewStampReflectorExecutor(stampCfg stamp.Config, logger *slog.Logger) *Stam
 	}
 }
 
-func (e *StampReflectorExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (api.ProbeResult, error) {
+func (e *StampReflectorExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (common.ProbeResult, error) {
 
 	p, ok := params.(*api.AgentTaskStampReflectorParams)
 	if !ok {
-		return api.ProbeResult{}, fmt.Errorf("stamp-sender: expected AgentTaskStampSenderParams, got %T", params)
+		return common.ProbeResult{}, fmt.Errorf("stamp-sender: expected AgentTaskStampSenderParams, got %T", params)
 	}
 
 	reflectorConfig := stamp.ReflectorConfig{
@@ -42,7 +43,7 @@ func (e *StampReflectorExecutor) Execute(ctx context.Context, params api.TaskPar
 	reflector, err := stamp.NewReflector(reflectorConfig)
 	if err != nil {
 		e.logger.ErrorContext(ctx, "couldn't create reflector")
-		return api.ProbeResult{}, err
+		return common.ProbeResult{}, err
 	}
 
 	errChan := make(chan error, 1)
@@ -60,11 +61,11 @@ func (e *StampReflectorExecutor) Execute(ctx context.Context, params api.TaskPar
 
 		<-errChan
 
-		return api.ProbeResult{}, ctx.Err()
+		return common.ProbeResult{}, ctx.Err()
 	case err := <-errChan:
 		if err != nil {
 			e.logger.ErrorContext(ctx, "reflector errored out", "err", err)
 		}
-		return api.ProbeResult{}, err
+		return common.ProbeResult{}, err
 	}
 }

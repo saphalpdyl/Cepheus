@@ -2,6 +2,7 @@ package cepheusagent
 
 import (
 	"cepheus/api"
+	"cepheus/common"
 	"cepheus/stamp"
 	"context"
 	"fmt"
@@ -23,10 +24,10 @@ func NewStampSenderExecutor(stampCfg stamp.Config, logger *slog.Logger) *StampSe
 	}
 }
 
-func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (api.ProbeResult, error) {
+func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (common.ProbeResult, error) {
 	p, ok := params.(*api.AgentTaskStampSenderParams)
 	if !ok {
-		return api.ProbeResult{}, fmt.Errorf("stamp-sender: expected AgentTaskStampSenderParams, got %T", params)
+		return common.ProbeResult{}, fmt.Errorf("stamp-sender: expected AgentTaskStampSenderParams, got %T", params)
 	}
 
 	sender, err := stamp.NewSender(stamp.SenderConfig{
@@ -37,7 +38,7 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 		OnError:    func(err error) { e.logger.ErrorContext(ctx, "stamp sender error", "err", err) },
 	})
 	if err != nil {
-		return api.ProbeResult{}, fmt.Errorf("stamp-sender: create: %w", err)
+		return common.ProbeResult{}, fmt.Errorf("stamp-sender: create: %w", err)
 	}
 	defer sender.Close()
 
@@ -61,7 +62,7 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 		if ctx.Err() != nil {
 			// Compute from whatever we have collected, sent >= half of Packetcount
 			if sent < (p.PacketCount / 2) {
-				return api.ProbeResult{}, nil
+				return common.ProbeResult{}, nil
 			}
 			return computeProbeResult(rtts, spec, sent, p), ctx.Err()
 		}
@@ -75,7 +76,7 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 			rtt, err := computeRTT(pkt, t4, e.stampConfig.ErrorEstimate.ClockFormat)
 			if err != nil {
 				e.logger.ErrorContext(ctx, "error computing RTT for sender")
-				return api.ProbeResult{}, err
+				return common.ProbeResult{}, err
 			}
 			rtts = append(rtts, *rtt)
 		}
@@ -84,7 +85,7 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 			select {
 			case <-time.After(interval):
 			case <-ctx.Done():
-				return api.ProbeResult{}, ctx.Err()
+				return common.ProbeResult{}, ctx.Err()
 			}
 		}
 	}
@@ -92,11 +93,11 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 	return computeProbeResult(rtts, spec, sent, p), nil
 }
 
-func computeProbeResult(rtts []time.Duration, spec *api.Task, sent int, p *api.AgentTaskStampSenderParams) api.ProbeResult {
+func computeProbeResult(rtts []time.Duration, spec *api.Task, sent int, p *api.AgentTaskStampSenderParams) common.ProbeResult {
 	stats := computeRTTStats(rtts)
-	return api.ProbeResult{
+	return common.ProbeResult{
 		TaskID:    spec.TaskID,
-		ProbeType: api.ProbeTypeStamp,
+		ProbeType: common.ProbeTypeStamp,
 		Kind:      string(spec.Type),
 		Timestamp: time.Now(),
 		Data: map[string]any{
