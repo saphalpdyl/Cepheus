@@ -55,6 +55,10 @@ services:
       - OTEL_ENDPOINT=otel-collector:4318
       - "NATS_LISTEN_SUBJECT=cepheus.probe.stamp.*"
       - NATS_LISTEN_URL=nats://nats-server:4222
+      - CEPHEUS_DB_URL=postgres://postgres:admin@db:5432/postgres?sslmode=disable
+    depends_on:
+      - db
+      - nats-server
 
   # ----- Our own stuff -----
 
