@@ -5,6 +5,7 @@ package cepheusagent
 import (
 	"cepheus/api"
 	"cepheus/cepheus-agent/log"
+	"cepheus/common"
 	"cepheus/telemetry"
 	"context"
 	"encoding/json"
@@ -70,7 +71,7 @@ func (d *Dispatcher) Start(ctx context.Context, interval time.Duration) (err err
 					break
 				}
 
-				payload := ReportPayload{
+				payload := common.ReportPayload{
 					Payload:       data,
 					SerialID:      d.SerialID,
 					SentTimestamp: time.Now(),

@@ -3,9 +3,10 @@
 # Host Related
 build:
 	docker build -t cepheus-server:latest -f docker/cepheus-server.Dockerfile .
+	docker build -t cepheus-stamp-processor:latest -f docker/cepheus-stamp-processor.Dockerfile .
 
 dev: build
-	docker compose up --build cepheus-server
+	docker compose up --build cepheus-server cepheus-stamp-processor
 
 db:
 	docker compose up --build pgadmin db nats-server
@@ -46,3 +47,7 @@ test.integration: test.build
 	go test -v -tags integration ./stamp/tests/integration
 	docker compose -f docker-compose.test.yaml exec scamper-test-suite go test -v -tags integration /app/scamper/tests/integration
 	docker compose -f docker-compose.test.yaml down
+
+# Generators
+sqlc:
+	docker run --rm -v .:/src -w /src sqlc/sqlc generate

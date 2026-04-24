@@ -1,4 +1,5 @@
 services:
+  # ----- External Services -----
   db:
     image: timescale/timescaledb:latest-pg17
     container_name: cepheus-timescaledb
@@ -20,6 +21,17 @@ services:
       - 5050:80
     depends_on:
       - db
+  nats-server:
+    image: nats:2.12.7-scratch
+    container_name: cepheus-nats
+    ports:
+      - 4222:4222
+      - 8222:8222
+    command: ["--http_port", "8222", "-js", "-sd", "/data"]
+
+  # ----- External Services -----
+
+  # ----- Our own stuff -----
 
   cepheus-server:
     image: cepheus-server:latest
@@ -32,14 +44,19 @@ services:
       - db
       - otel-collector
 
-  nats-server:
-    image: nats:2.12.7-scratch
-    container_name: cepheus-nats
+  # Processors
+  cepheus-stamp-processor:
+    image: cepheus-stamp-processor:latest
+    container_name: cepheus-stamp-processor
     ports:
-      - 4222:4222
-      - 8222:8222
-    command: ["--http_port", "8222", "-js", "-sd", "/data"]
+      - 8080:8080
+    environment:
+      - OTEL_SINK=otel
+      - OTEL_ENDPOINT=otel-collector:4318
 
+  # ----- Our own stuff -----
+
+  # ----- Telemetry ----- 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     volumes:
@@ -73,6 +90,8 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
+
+  # ----- Telemetry ----- 
 
 volumes:
   tempo-data:

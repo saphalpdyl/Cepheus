@@ -1,4 +1,4 @@
-package cepheusagent
+package common
 
 import (
 	"cepheus/api"
