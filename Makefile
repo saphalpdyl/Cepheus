@@ -4,9 +4,10 @@
 build:
 	docker build -t cepheus-server:latest -f docker/cepheus-server.Dockerfile .
 	docker build -t cepheus-stamp-processor:latest -f docker/cepheus-stamp-processor.Dockerfile .
+	docker build -t cepheus-trace-processor:latest -f docker/cepheus-trace-processor.Dockerfile .
 
 dev: build
-	docker compose up --build cepheus-server cepheus-stamp-processor
+	docker compose up --build cepheus-server cepheus-stamp-processor cepheus-trace-processor
 
 db:
 	docker compose up --build pgadmin db nats-server

@@ -60,6 +60,21 @@ services:
       - db
       - nats-server
 
+  cepheus-trace-processor:
+    image: cepheus-trace-processor:latest
+    container_name: cepheus-trace-processor
+    ports:
+      - 8086:8080
+    environment:
+      - OTEL_SINK=otel
+      - OTEL_ENDPOINT=otel-collector:4318
+      - "NATS_LISTEN_SUBJECT=cepheus.probe.trace.*"
+      - NATS_LISTEN_URL=nats://nats-server:4222
+      - CEPHEUS_DB_URL=postgres://postgres:admin@db:5432/postgres?sslmode=disable
+    depends_on:
+      - db
+      - nats-server
+
   # ----- Our own stuff -----
 
   # ----- Telemetry ----- 
