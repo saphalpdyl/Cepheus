@@ -3,6 +3,7 @@ package traceprocessor
 import (
 	"cepheus/common"
 	"cepheus/processors/shared/log"
+	traceprocessor_db "cepheus/processors/trace-processor/db"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,8 @@ type TraceProcessor struct {
 	config TraceProcessorConfig
 
 	logger *slog.Logger
+	pool   *pgxpool.Pool
+	query  *traceprocessor_db.Queries
 }
 
 func NewTraceProcessor(instanceId string, config TraceProcessorConfig, logger *slog.Logger) TraceProcessor {
@@ -37,6 +40,9 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 		return err
 	}
 	defer pool.Close()
+
+	s.pool = pool
+	s.query = traceprocessor_db.New(pool)
 
 	nc, err := nats.Connect(
 		s.config.NatsConnectURL,
@@ -115,12 +121,40 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 					continue
 				}
 
-				// marshaledMap, err := json.Marshal(payload.Payload.Data)
-				// if err != nil {
-				// 	s.logger.ErrorContext(ctx, "failed to marshal data map to json", log.Err(err))
-				// 	msg.Nak()
-				// 	continue
-				// }
+				var traceData common.TraceData
+				if err = json.Unmarshal(payload.Payload.Data, &traceData); err != nil {
+					s.logger.ErrorContext(ctx, "couldn't unmarshal traceData wrapper")
+					msg.Nak()
+					continue
+				}
+
+				if traceData.Format != "json" {
+					s.logger.ErrorContext(ctx, fmt.Sprintf("unsupported format %s", string(traceData.Format)))
+					msg.Nak()
+					continue
+				}
+
+				// Unmarshal json
+				if traceData.Type == common.TraceProbeTypeTrace {
+					var traceDataPayload common.TraceDataTracePayload
+					if err = json.Unmarshal(traceData.Data, &traceDataPayload); err != nil {
+						s.logger.ErrorContext(ctx, "failed to unmarshal normal json-based traceroute data", log.Err(err))
+						msg.Nak()
+						continue
+					}
+
+					// Do something here for now
+
+				} else if traceData.Type == common.TraceProbeTypeTraceLb {
+					// TODO: Do this
+					s.logger.WarnContext(ctx, "json-based tracelb parser not implemented yet")
+					msg.Ack()
+					continue
+				} else {
+					s.logger.ErrorContext(ctx, fmt.Sprintf("unsupported type %s", string(traceData.Type)))
+					msg.Nak()
+					continue
+				}
 
 				msg.Ack()
 			}

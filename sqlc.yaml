@@ -1,0 +1,12 @@
+version: "2"
+sql:
+  # Trace processor
+  - engine: "postgresql"
+    queries: "db/queries/processors/trace-processor/"
+    schema: 
+      - "db/init/03-trace.sql"
+    gen:
+      go:
+        package: "traceprocessor_db"
+        out: "processors/trace-processor/db/"
+        sql_package: "pgx/v5"

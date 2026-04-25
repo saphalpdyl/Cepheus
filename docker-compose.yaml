@@ -6,8 +6,7 @@ services:
     environment:
       - POSTGRES_PASSWORD=admin
     volumes:
-      - ./db/setup.sql:/docker-entrypoint-initdb.d/01-setup.sql
-      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - ./db/init/:/docker-entrypoint-initdb.d/
     ports: 
       - 5435:5432
   

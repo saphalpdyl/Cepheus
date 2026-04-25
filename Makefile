@@ -50,5 +50,5 @@ test.integration: test.build
 	docker compose -f docker-compose.test.yaml down
 
 # Generators
-sqlc:
-	docker run --rm -v .:/src -w /src sqlc/sqlc generate
+sqlc-gen:
+	UID=$(shell id -u) GID=$(shell id -g) docker compose -f docker-compose.dev.yaml run --rm sqlc

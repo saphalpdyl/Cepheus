@@ -1,0 +1,12 @@
+# Docker compose file typicall used for dev-only containers
+# Example: sqlc generations, protobuf generators etc.
+
+services:
+  sqlc:
+    image: sqlc/sqlc:latest
+    container_name: cepheus-dev-sqlc
+    volumes:
+      - .:/src
+    working_dir: /src
+    command: generate
+    user: "${UID}:${GID}"
