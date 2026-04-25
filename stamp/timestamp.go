@@ -45,8 +45,8 @@ func NewTimestamp(p TimestampParams) (*Timestamp, error) {
 
 func (t *Timestamp) ToTime(clockFormat TimestampClockFormat) (*time.Time, error) {
 	if clockFormat == ClockFormatNTP {
-		time := wireNTPTimestampToTime(t.Seconds, t.Fraction)
-		return &time, nil
+		t := wireNTPTimestampToTime(t.Seconds, t.Fraction)
+		return &t, nil
 	}
 
 	return nil, errors.New("invalid clock format")
