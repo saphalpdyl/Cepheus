@@ -14,7 +14,7 @@ CREATE TABLE stamp_data (
     p95_rtt     DOUBLE PRECISION NOT NULL
 );
 
-SELECT create_hypertable('stamp_data', by_range('timestamp'));
+SELECT create_hypertable('stamp_data', 'timestamp');
 
 CREATE INDEX ON stamp_data (serial_id, target, timestamp DESC);
 CREATE INDEX ON stamp_data (serial_id, timestamp DESC);

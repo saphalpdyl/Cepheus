@@ -94,12 +94,6 @@ func (q *Queries) GetMeasurementsByPath(ctx context.Context, arg GetMeasurements
 	return items, nil
 }
 
-const insertTraceHop = `-- name: InsertTraceHop :exec
-INSERT INTO trace_hops
-    (timestamp, measurement_id, ip, ttl, rtt_ms, icmp_type, icmp_code, reply_ttl, asn, is_no_hop)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-`
-
 type InsertTraceHopParams struct {
 	Timestamp     pgtype.Timestamptz
 	MeasurementID pgtype.UUID
@@ -111,22 +105,6 @@ type InsertTraceHopParams struct {
 	ReplyTtl      pgtype.Int4
 	Asn           pgtype.Int4
 	IsNoHop       bool
-}
-
-func (q *Queries) InsertTraceHop(ctx context.Context, arg InsertTraceHopParams) error {
-	_, err := q.db.Exec(ctx, insertTraceHop,
-		arg.Timestamp,
-		arg.MeasurementID,
-		arg.Ip,
-		arg.Ttl,
-		arg.RttMs,
-		arg.IcmpType,
-		arg.IcmpCode,
-		arg.ReplyTtl,
-		arg.Asn,
-		arg.IsNoHop,
-	)
-	return err
 }
 
 const insertTraceMeasurement = `-- name: InsertTraceMeasurement :one

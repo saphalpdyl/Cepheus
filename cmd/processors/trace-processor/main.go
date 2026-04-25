@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cepheus/processors/shared/log"
 	traceprocessor "cepheus/processors/trace-processor"
 	"cepheus/telemetry"
 	"context"
@@ -10,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 func main() {
@@ -43,8 +43,17 @@ func main() {
 
 	slog.InfoContext(ctx, "starting trace processor")
 
-	time.Sleep(10 * time.Second)
-	<-ctx.Done()
+	processor := traceprocessor.NewTraceProcessor(
+		serviceInstanceId,
+		config,
+		slog.Default().With(log.Domain(log.DomainProcessorLifecycle)),
+	)
+
+	err = processor.Start(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to start trace processor", log.Err(err))
+		os.Exit(1)
+	}
 
 	slog.InfoContext(ctx, "shutting down")
 

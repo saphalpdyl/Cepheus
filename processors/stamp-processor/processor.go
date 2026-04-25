@@ -97,35 +97,34 @@ func (s *StampProcessor) Start(ctx context.Context) error {
 				continue
 			}
 
-			s.logger.InfoContext(ctx, fmt.Sprintf("fetched batch with %d messages", len(msgs.Messages())))
 			for msg := range msgs.Messages() {
 
 				var payload common.ReportPayload
 				data := msg.Data()
 				if err = json.Unmarshal(data, &payload); err != nil {
 					s.logger.WarnContext(ctx, "failed to unmarshal payload", log.Err(err))
-					msg.Nak()
+					_ = msg.Nak()
 					continue
 				}
 
 				// Parse the inner data
 				if payload.Payload.ProbeType != common.ProbeTypeStamp {
 					s.logger.ErrorContext(ctx, "got invalid probe type", "expected", "stamp", "got", payload.Payload.ProbeType)
-					msg.Nak()
+					_ = msg.Nak()
 					continue
 				}
 
 				marshaledMap, err := json.Marshal(payload.Payload.Data)
 				if err != nil {
 					s.logger.ErrorContext(ctx, "failed to marshal data map to json", log.Err(err))
-					msg.Nak()
+					_ = msg.Nak()
 					continue
 				}
 
 				var stampData common.StampData
 				if err = json.Unmarshal(marshaledMap, &stampData); err != nil {
 					s.logger.WarnContext(ctx, "failed to unmarshal inner payload data", log.Err(err))
-					msg.Nak()
+					_ = msg.Nak()
 					continue
 				}
 
@@ -140,11 +139,15 @@ func (s *StampProcessor) Start(ctx context.Context) error {
 				)
 				if err != nil {
 					s.logger.ErrorContext(ctx, "failed to insert stamp data", log.Err(err))
-					msg.Nak()
+					_ = msg.Nak()
 					continue
 				}
 
-				msg.Ack()
+				err = msg.Ack()
+				if err != nil {
+					s.logger.ErrorContext(ctx, "failed to ack message", log.Err(err))
+					return
+				}
 			}
 		}
 

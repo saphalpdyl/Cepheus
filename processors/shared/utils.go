@@ -1,0 +1,14 @@
+package processor_shared
+
+import "github.com/jackc/pgx/v5/pgtype"
+
+func Int4(v int) pgtype.Int4 {
+	return pgtype.Int4{Int32: int32(v), Valid: true}
+}
+
+func Float8[T ~int | ~int32 | ~int64 | ~float32 | ~float64](v T) pgtype.Float8 {
+	return pgtype.Float8{
+		Float64: float64(v),
+		Valid:   true,
+	}
+}

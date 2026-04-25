@@ -2,14 +2,17 @@ package traceprocessor
 
 import (
 	"cepheus/common"
+	processor_shared "cepheus/processors/shared"
 	"cepheus/processors/shared/log"
 	traceprocessor_db "cepheus/processors/trace-processor/db"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -136,14 +139,15 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 
 				// Unmarshal json
 				if traceData.Type == common.TraceProbeTypeTrace {
-					var traceDataPayload common.TraceDataTracePayload
-					if err = json.Unmarshal(traceData.Data, &traceDataPayload); err != nil {
-						s.logger.ErrorContext(ctx, "failed to unmarshal normal json-based traceroute data", log.Err(err))
+					if err = s.processNormalTrace(
+						ctx,
+						pool,
+						&traceData,
+						&payload,
+					); err != nil {
 						msg.Nak()
 						continue
 					}
-
-					// Do something here for now
 
 				} else if traceData.Type == common.TraceProbeTypeTraceLb {
 					// TODO: Do this
@@ -163,6 +167,113 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 	}()
 
 	<-ctx.Done()
+
+	return nil
+}
+
+func (s *TraceProcessor) processNormalTrace(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	traceData *common.TraceData,
+	payload *common.ReportPayload,
+) error {
+	var traceDataPayload common.TraceDataTracePayload
+	if err := json.Unmarshal(traceData.Data, &traceDataPayload); err != nil {
+		s.logger.ErrorContext(ctx, "failed to unmarshal normal json-based traceroute data", log.Err(err))
+		return err
+	}
+
+	srcIp, err := netip.ParseAddr(traceDataPayload.Src)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to parse src ip", log.Err(err), "src", traceDataPayload.Src)
+		return err
+	}
+
+	dstIp, err := netip.ParseAddr(traceDataPayload.Dst)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to parse dst ip", log.Err(err), "dst", traceDataPayload.Dst)
+		return err
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to begin transaction", log.Err(err))
+		return err
+	}
+
+	defer tx.Rollback(ctx)
+
+	measurement, err := s.query.WithTx(tx).InsertTraceMeasurement(
+		ctx,
+		traceprocessor_db.InsertTraceMeasurementParams{
+			Timestamp:  pgtype.Timestamptz{Time: payload.Payload.Timestamp, Valid: true},
+			Type:       string(traceData.Type),
+			Src:        srcIp,
+			Dst:        dstIp,
+			Method:     string(traceData.Method),
+			StopReason: traceDataPayload.StopReason,
+			HopCount:   int32(traceDataPayload.HopCount),
+			PathHash:   "",
+			Raw:        traceData.Data,
+		},
+	)
+
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to insert trace measurement", log.Err(err))
+		return err
+	}
+
+	// Generate trace hops
+	var traceHops []traceprocessor_db.InsertTraceHopParams
+	for _, hop := range traceDataPayload.Hops {
+		var hopIp netip.Addr
+		if hop.Addr != "" {
+			hopIp, err = netip.ParseAddr(hop.Addr)
+			if err != nil {
+				s.logger.ErrorContext(ctx, "failed to parse hop ip", log.Err(err), "hop_ip", hop.Addr)
+				return err
+			}
+		}
+
+		traceHops = append(traceHops, traceprocessor_db.InsertTraceHopParams{
+			Timestamp:     pgtype.Timestamptz{Time: payload.Payload.Timestamp, Valid: true},
+			MeasurementID: measurement.ID,
+			Ip:            &hopIp,
+			Ttl:           int32(hop.ProbeTTL),
+			RttMs:         processor_shared.Float8(time.Duration(hop.Rtt) / time.Millisecond),
+			IcmpType:      processor_shared.Int4(hop.IcmpType),
+			IcmpCode:      processor_shared.Int4(hop.IcmpCode),
+			ReplyTtl:      processor_shared.Int4(hop.ReplyTTL),
+			Asn:           processor_shared.Int4(0),
+			IsNoHop:       false,
+		})
+	}
+
+	for _, hop := range traceDataPayload.NoHops {
+		traceHops = append(traceHops, traceprocessor_db.InsertTraceHopParams{
+			Timestamp:     pgtype.Timestamptz{Time: payload.Payload.Timestamp, Valid: true},
+			MeasurementID: measurement.ID,
+			Ip:            nil,
+			Ttl:           int32(hop.ProbeTTL),
+			RttMs:         pgtype.Float8{},
+			IcmpType:      pgtype.Int4{},
+			IcmpCode:      pgtype.Int4{},
+			ReplyTtl:      pgtype.Int4{},
+			Asn:           pgtype.Int4{},
+			IsNoHop:       true,
+		})
+	}
+
+	_, err = s.query.WithTx(tx).InsertTraceHop(ctx, traceHops)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to insert trace hops", log.Err(err))
+		return err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		s.logger.ErrorContext(ctx, "failed to commit transaction", log.Err(err))
+		return err
+	}
 
 	return nil
 }

@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
 CREATE TABLE
     IF NOT EXISTS agent_config (
         id TEXT PRIMARY KEY,
