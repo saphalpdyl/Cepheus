@@ -47,3 +47,5 @@ go.work
 
 # Web
 .next/**
+
+.elixir_ls

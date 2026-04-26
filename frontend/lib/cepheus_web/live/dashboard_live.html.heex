@@ -1,0 +1,100 @@
+<div class="mx-auto max-w-6xl p-6 space-y-6">
+  <header class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold">Cepheus Dashboard</h1>
+      <p class="text-sm opacity-70">
+        Last refreshed {fmt_dt(@last_loaded_at)} · auto-refresh every 5s
+      </p>
+    </div>
+
+    <form phx-change="set_window" class="flex items-center gap-2">
+      <label for="window" class="text-sm">RTT window</label>
+      <select id="window" name="window" class="select select-bordered select-sm">
+        <option :for={w <- @windows} value={w} selected={w == @window}>{w}</option>
+      </select>
+    </form>
+  </header>
+
+  <section :if={@devices == []} class="rounded border p-6 opacity-70 text-center">
+    No devices yet — seed the database with <code>db/init/04-seed.sql</code>.
+  </section>
+
+  <section :for={device <- @devices} class="rounded-lg border shadow-sm p-5 space-y-4">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <div>
+        <h2 class="text-xl font-semibold">{device.serial_id}</h2>
+        <p class="text-xs opacity-70 font-mono" title={device.agent_config_id}>
+          config {short_uuid(device.agent_config_id)} · gen {device.generation}
+        </p>
+      </div>
+      <dl class="text-sm grid grid-cols-2 gap-x-6 gap-y-1">
+        <dt class="opacity-60">report endpoint</dt>
+        <dd class="font-mono">{device.report_endpoint}</dd>
+        <dt class="opacity-60">report interval</dt>
+        <dd>{device.report_interval_seconds}s</dd>
+        <dt class="opacity-60">scamper pps</dt>
+        <dd>{device.scamper_pps}</dd>
+      </dl>
+    </div>
+
+    <div class="space-y-2">
+      <h3 class="text-sm font-semibold uppercase tracking-wide opacity-70">Probes</h3>
+      <% tasks = Map.get(@tasks_by_config_id, device.agent_config_id, []) %>
+      <p :if={tasks == []} class="text-sm opacity-60">No probes for this config.</p>
+      <table :if={tasks != []} class="w-full text-sm">
+        <thead class="text-left opacity-70">
+          <tr>
+            <th class="py-1 pr-4">task_id</th>
+            <th class="py-1 pr-4">type</th>
+            <th class="py-1 pr-4">enabled</th>
+            <th class="py-1 pr-4">schedule</th>
+            <th class="py-1">params</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for={t <- tasks} class="border-t">
+            <td class="py-1 pr-4 font-mono">{t.task_id}</td>
+            <td class="py-1 pr-4">{t.type}</td>
+            <td class="py-1 pr-4">{if t.enabled, do: "yes", else: "no"}</td>
+            <td class="py-1 pr-4">
+              <%= if t.schedule_enabled do %>
+                every {t.schedule_interval_seconds}s ± {t.schedule_jitter_percent}%
+              <% else %>
+                disabled
+              <% end %>
+            </td>
+            <td class="py-1 font-mono text-xs opacity-80">{t.params}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="space-y-2">
+      <h3 class="text-sm font-semibold uppercase tracking-wide opacity-70">
+        Avg STAMP RTT (last {@window})
+      </h3>
+      <% rtts = Map.get(@rtt_by_serial, device.serial_id, []) %>
+      <p :if={rtts == []} class="text-sm opacity-60">No STAMP samples in window.</p>
+      <table :if={rtts != []} class="w-full text-sm">
+        <thead class="text-left opacity-70">
+          <tr>
+            <th class="py-1 pr-4">target</th>
+            <th class="py-1 pr-4">avg rtt</th>
+            <th class="py-1 pr-4">avg loss</th>
+            <th class="py-1 pr-4">samples</th>
+            <th class="py-1">last seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for={r <- rtts} class="border-t">
+            <td class="py-1 pr-4 font-mono">{r.target}</td>
+            <td class="py-1 pr-4">{fmt_rtt(r.avg_rtt_us)}</td>
+            <td class="py-1 pr-4">{fmt_loss(r.avg_loss)}</td>
+            <td class="py-1 pr-4">{r.samples}</td>
+            <td class="py-1">{fmt_dt(r.last_seen)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

@@ -83,6 +83,23 @@ services:
       - db
       - nats-server
 
+  cepheus-frontend:
+    image: cepheus-frontend:latest
+    container_name: cepheus-frontend
+    build:
+      context: ./frontend
+      dockerfile: ../docker/cepheus-frontend.Dockerfile
+    ports:
+      - 4001:4000
+    environment:
+      - PHX_SERVER=true
+      - PHX_HOST=localhost
+      - PORT=4000
+      - DATABASE_URL=ecto://postgres:admin@db:5432/postgres
+      - SECRET_KEY_BASE=8PzQRZwBwPq9XeYp32l5psBz+xNFvUpi8f0jAlVAci3JsPOawRU5KFJGvgehEqRA
+    depends_on:
+      - db
+
   # ----- Our own stuff -----
 
   # ----- Telemetry ----- 
