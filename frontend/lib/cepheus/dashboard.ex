@@ -51,7 +51,7 @@ defmodule Cepheus.Dashboard do
            schedule_interval_seconds,
            schedule_jitter_percent,
            schedule_enabled,
-           params::text
+           params
     FROM agent_task
     WHERE agent_config_id = $1
     ORDER BY task_id
@@ -82,6 +82,8 @@ defmodule Cepheus.Dashboard do
     sql = """
     SELECT target,
            AVG(avg_rtt)::BIGINT AS avg_rtt,
+           SUM(sent)            AS total_sent,
+           SUM(received)        AS total_received,
            AVG(loss)            AS avg_loss,
            COUNT(*)             AS samples,
            MAX(timestamp)       AS last_seen
@@ -95,13 +97,15 @@ defmodule Cepheus.Dashboard do
     %Postgrex.Result{rows: rows} =
       Ecto.Adapters.SQL.query!(Repo, sql, [serial_id])
 
-    Enum.map(rows, fn [target, avg_rtt, avg_loss, samples, last_seen] ->
+    Enum.map(rows, fn [target, avg_rtt, total_sent, total_received, avg_loss, samples, last_seen] ->
       %{
         target: target,
         avg_rtt_us: avg_rtt,
         avg_loss: avg_loss,
         samples: samples,
-        last_seen: last_seen
+        last_seen: last_seen,
+        total_sent: total_sent,
+        total_received: total_received,
       }
     end)
   end

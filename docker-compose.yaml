@@ -88,7 +88,11 @@ services:
     container_name: cepheus-frontend
     build:
       context: ./frontend
-      dockerfile: ../docker/cepheus-frontend.Dockerfile
+      dockerfile: docker/cepheus-frontend.Dockerfile
+    volumes:
+      - ./frontend:/app
+      - deps:/app/deps
+      - build:/app/_build
     ports:
       - 4001:4000
     environment:
@@ -143,3 +147,5 @@ volumes:
   tempo-data:
   loki-data:
   grafana-data:
+  deps:
+  build:

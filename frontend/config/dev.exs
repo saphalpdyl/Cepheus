@@ -1,11 +1,11 @@
 import Config
 
+database_url =
+  System.get_env("DATABASE_URL") ||
+    raise "DATABASE_URL is missing. The frontend must be run inside docker-compose."
+
 config :cepheus, Cepheus.Repo,
-  username: "postgres",
-  password: "admin",
-  hostname: System.get_env("DB_HOST", "localhost"),
-  port: String.to_integer(System.get_env("DB_PORT", "5435")),
-  database: "postgres",
+  url: database_url,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 5

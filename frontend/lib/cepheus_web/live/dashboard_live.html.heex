@@ -63,7 +63,7 @@
                 disabled
               <% end %>
             </td>
-            <td class="py-1 font-mono text-xs opacity-80">{t.params}</td>
+            <td class="py-1 font-mono text-xs opacity-80">{inspect(t.params)}</td>
           </tr>
         </tbody>
       </table>
@@ -79,6 +79,8 @@
         <thead class="text-left opacity-70">
           <tr>
             <th class="py-1 pr-4">target</th>
+            <th class="py-1 pr-4">Total sent</th>
+            <th class="py-1 pr-4">Total received</th>
             <th class="py-1 pr-4">avg rtt</th>
             <th class="py-1 pr-4">avg loss</th>
             <th class="py-1 pr-4">samples</th>
@@ -88,6 +90,8 @@
         <tbody>
           <tr :for={r <- rtts} class="border-t">
             <td class="py-1 pr-4 font-mono">{r.target}</td>
+            <td class="py-1 pr-4 font-mono">{r.total_sent}</td>
+            <td class="py-1 pr-4 font-mono">{r.total_received}</td>
             <td class="py-1 pr-4">{fmt_rtt(r.avg_rtt_us)}</td>
             <td class="py-1 pr-4">{fmt_loss(r.avg_loss)}</td>
             <td class="py-1 pr-4">{r.samples}</td>
