@@ -1,7 +1,7 @@
 -- name: InsertTraceMeasurement :one
 INSERT INTO trace_measurements
-    (timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+(serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 
 -- name: InsertTraceHop :copyfrom

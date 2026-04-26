@@ -50,7 +50,7 @@ func (q *Queries) GetHopsByMeasurement(ctx context.Context, measurementID pgtype
 }
 
 const getMeasurementsByPath = `-- name: GetMeasurementsByPath :many
-SELECT id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw FROM trace_measurements
+SELECT id, serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw FROM trace_measurements
 WHERE src = $1
   AND dst = $2
   AND timestamp > NOW() - $3::interval
@@ -74,6 +74,8 @@ func (q *Queries) GetMeasurementsByPath(ctx context.Context, arg GetMeasurements
 		var i TraceMeasurement
 		if err := rows.Scan(
 			&i.ID,
+			&i.SerialID,
+			&i.AgentConfigID,
 			&i.Timestamp,
 			&i.Type,
 			&i.Src,
@@ -109,25 +111,29 @@ type InsertTraceHopParams struct {
 
 const insertTraceMeasurement = `-- name: InsertTraceMeasurement :one
 INSERT INTO trace_measurements
-    (timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw
+(serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw
 `
 
 type InsertTraceMeasurementParams struct {
-	Timestamp  pgtype.Timestamptz
-	Type       string
-	Src        netip.Addr
-	Dst        netip.Addr
-	Method     string
-	StopReason string
-	HopCount   int32
-	PathHash   string
-	Raw        []byte
+	SerialID      string
+	AgentConfigID pgtype.UUID
+	Timestamp     pgtype.Timestamptz
+	Type          string
+	Src           netip.Addr
+	Dst           netip.Addr
+	Method        string
+	StopReason    string
+	HopCount      int32
+	PathHash      string
+	Raw           []byte
 }
 
 func (q *Queries) InsertTraceMeasurement(ctx context.Context, arg InsertTraceMeasurementParams) (TraceMeasurement, error) {
 	row := q.db.QueryRow(ctx, insertTraceMeasurement,
+		arg.SerialID,
+		arg.AgentConfigID,
 		arg.Timestamp,
 		arg.Type,
 		arg.Src,
@@ -141,6 +147,8 @@ func (q *Queries) InsertTraceMeasurement(ctx context.Context, arg InsertTraceMea
 	var i TraceMeasurement
 	err := row.Scan(
 		&i.ID,
+		&i.SerialID,
+		&i.AgentConfigID,
 		&i.Timestamp,
 		&i.Type,
 		&i.Src,

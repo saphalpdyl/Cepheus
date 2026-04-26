@@ -139,12 +139,7 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 
 				// Unmarshal json
 				if traceData.Type == common.TraceProbeTypeTrace {
-					if err = s.processNormalTrace(
-						ctx,
-						pool,
-						&traceData,
-						&payload,
-					); err != nil {
+					if err = s.processNormalTrace(ctx, pool, &traceData, &payload, payload.SerialID, payload.AgentConfigId); err != nil {
 						msg.Nak()
 						continue
 					}
@@ -171,12 +166,7 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *TraceProcessor) processNormalTrace(
-	ctx context.Context,
-	pool *pgxpool.Pool,
-	traceData *common.TraceData,
-	payload *common.ReportPayload,
-) error {
+func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.Pool, traceData *common.TraceData, payload *common.ReportPayload, serialId string, agentConfigId string) error {
 	var traceDataPayload common.TraceDataTracePayload
 	if err := json.Unmarshal(traceData.Data, &traceDataPayload); err != nil {
 		s.logger.ErrorContext(ctx, "failed to unmarshal normal json-based traceroute data", log.Err(err))
@@ -203,18 +193,26 @@ func (s *TraceProcessor) processNormalTrace(
 
 	defer tx.Rollback(ctx)
 
+	parsedAgentConfigId, err := processor_shared.UUID(agentConfigId)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to parse agent config id", log.Err(err))
+		return err
+	}
+
 	measurement, err := s.query.WithTx(tx).InsertTraceMeasurement(
 		ctx,
 		traceprocessor_db.InsertTraceMeasurementParams{
-			Timestamp:  pgtype.Timestamptz{Time: payload.Payload.Timestamp, Valid: true},
-			Type:       string(traceData.Type),
-			Src:        srcIp,
-			Dst:        dstIp,
-			Method:     string(traceData.Method),
-			StopReason: traceDataPayload.StopReason,
-			HopCount:   int32(traceDataPayload.HopCount),
-			PathHash:   "",
-			Raw:        traceData.Data,
+			Timestamp:     pgtype.Timestamptz{Time: payload.Payload.Timestamp, Valid: true},
+			SerialID:      serialId,
+			AgentConfigID: *parsedAgentConfigId,
+			Type:          string(traceData.Type),
+			Src:           srcIp,
+			Dst:           dstIp,
+			Method:        string(traceData.Method),
+			StopReason:    traceDataPayload.StopReason,
+			HopCount:      int32(traceDataPayload.HopCount),
+			PathHash:      "",
+			Raw:           traceData.Data,
 		},
 	)
 

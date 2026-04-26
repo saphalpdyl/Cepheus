@@ -24,14 +24,16 @@ type TraceHop struct {
 }
 
 type TraceMeasurement struct {
-	ID         pgtype.UUID
-	Timestamp  pgtype.Timestamptz
-	Type       string
-	Src        netip.Addr
-	Dst        netip.Addr
-	Method     string
-	StopReason string
-	HopCount   int32
-	PathHash   string
-	Raw        []byte
+	ID            pgtype.UUID
+	SerialID      string
+	AgentConfigID pgtype.UUID
+	Timestamp     pgtype.Timestamptz
+	Type          string
+	Src           netip.Addr
+	Dst           netip.Addr
+	Method        string
+	StopReason    string
+	HopCount      int32
+	PathHash      string
+	Raw           []byte
 }

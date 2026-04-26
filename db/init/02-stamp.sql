@@ -1,17 +1,19 @@
 -- Tables for STAMP data
-CREATE TABLE stamp_data (
-    timestamp        TIMESTAMPTZ     NOT NULL,
-    serial_id   TEXT            NOT NULL,
-    target      TEXT            NOT NULL,
-    port        INTEGER         NOT NULL,
-    sent        INTEGER         NOT NULL,
-    received    INTEGER         NOT NULL,
-    loss        DOUBLE PRECISION NOT NULL,
-    avg_rtt     DOUBLE PRECISION NOT NULL,
-    min_rtt     DOUBLE PRECISION NOT NULL,
-    max_rtt     DOUBLE PRECISION NOT NULL,
-    p50_rtt     DOUBLE PRECISION NOT NULL,
-    p95_rtt     DOUBLE PRECISION NOT NULL
+CREATE TABLE stamp_data
+(
+    timestamp       TIMESTAMPTZ      NOT NULL,
+    serial_id       TEXT             REFERENCES device (serial_id) ON DELETE CASCADE,
+    agent_config_id UUID             REFERENCES agent_config (id) ON DELETE SET NULL,
+    target          TEXT             NOT NULL,
+    port            INTEGER          NOT NULL,
+    sent            INTEGER          NOT NULL,
+    received        INTEGER          NOT NULL,
+    loss            DOUBLE PRECISION NOT NULL,
+    avg_rtt         DOUBLE PRECISION NOT NULL,
+    min_rtt         DOUBLE PRECISION NOT NULL,
+    max_rtt         DOUBLE PRECISION NOT NULL,
+    p50_rtt         DOUBLE PRECISION NOT NULL,
+    p95_rtt         DOUBLE PRECISION NOT NULL
 );
 
 SELECT create_hypertable('stamp_data', 'timestamp');

@@ -52,3 +52,7 @@ test.integration: test.build
 # Generators
 sqlc-gen:
 	UID=$(shell id -u) GID=$(shell id -g) docker compose -f docker-compose.dev.yaml run --rm sqlc
+
+# Personal
+sync:
+	rsync -rav . cepheus:/home/vagrant/cepheus/ --exclude-from=.rsyncignore

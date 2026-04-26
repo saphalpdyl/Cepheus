@@ -17,7 +17,8 @@ import (
 )
 
 type Dispatcher struct {
-	SerialID string
+	SerialID       string
+	getAgentConfig func() string
 
 	probeDataStream *ProbeDataStream
 	logger          *slog.Logger
@@ -39,6 +40,8 @@ type DispatcherConfig struct {
 	JetStream       jetstream.JetStream
 	SerialID        string
 
+	GetAgentConfig func() string
+
 	JetStreamTimeout time.Duration
 }
 
@@ -49,6 +52,7 @@ func NewDispatcher(cfg DispatcherConfig) *Dispatcher {
 		js:              cfg.JetStream,
 		jsTimeout:       cfg.JetStreamTimeout,
 		SerialID:        cfg.SerialID,
+		getAgentConfig:  cfg.GetAgentConfig,
 	}
 }
 
@@ -74,6 +78,7 @@ func (d *Dispatcher) Start(ctx context.Context, interval time.Duration) (err err
 					Payload:       data,
 					SerialID:      d.SerialID,
 					SentTimestamp: time.Now(),
+					AgentConfigId: d.getAgentConfig(),
 				}
 
 				payloadData, err := json.Marshal(payload)

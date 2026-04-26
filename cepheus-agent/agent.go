@@ -119,6 +119,12 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 			JetStream:        js,
 			JetStreamTimeout: time.Duration(a.agentConfig.ReportTimeoutSeconds) * time.Second,
 			SerialID:         a.SerialId,
+			GetAgentConfig: func() string {
+				a.mu.RLock()
+				defer a.mu.RUnlock()
+
+				return a.agentConfig.ID
+			},
 		},
 	)
 	err = dispatcher.Start(ctx, time.Duration(a.agentConfig.ReportTimeoutSeconds)*time.Second)
@@ -245,7 +251,9 @@ func (a *Agent) pullAgentConfiguration(ctx context.Context) error {
 	}
 
 	if a.generation == 0 {
+		a.mu.Lock()
 		a.agentConfig = agentConfig
+		a.mu.Unlock()
 	}
 
 	return nil

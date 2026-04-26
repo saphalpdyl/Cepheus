@@ -17,6 +17,7 @@ type ReportPayload struct {
 	Payload       ProbeResult `json:"payload"`
 	SerialID      string      `json:"serial_id"`
 	SentTimestamp time.Time   `json:"sent_timestamp"`
+	AgentConfigId string      `json:"agent_config_id"`
 }
 
 // Used to differentiate data from different probes in dispatcher.go
