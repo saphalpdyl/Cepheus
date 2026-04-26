@@ -2,13 +2,16 @@ package stampprocessor
 
 import (
 	"cepheus/common"
+	processor_shared "cepheus/processors/shared"
 	"cepheus/processors/shared/log"
+	stampprocessor_db "cepheus/processors/stamp-processor/db"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -20,6 +23,8 @@ type StampProcessor struct {
 	config StampProcessorConfig
 
 	logger *slog.Logger
+	pool   *pgxpool.Pool
+	query  *stampprocessor_db.Queries
 }
 
 func NewStampProcessor(instanceId string, config StampProcessorConfig, logger *slog.Logger) StampProcessor {
@@ -37,6 +42,9 @@ func (s *StampProcessor) Start(ctx context.Context) error {
 		return err
 	}
 	defer pool.Close()
+
+	s.pool = pool
+	s.query = stampprocessor_db.New(pool)
 
 	nc, err := nats.Connect(
 		s.config.NatsConnectURL,
@@ -128,15 +136,32 @@ func (s *StampProcessor) Start(ctx context.Context) error {
 					continue
 				}
 
-				_, err = pool.Exec(ctx,
-					`INSERT INTO stamp_data
-					 (timestamp, serial_id, target, port, sent, received, loss, avg_rtt, min_rtt, max_rtt, p50_rtt, p95_rtt)
-					 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-					payload.Payload.Timestamp, payload.SerialID,
-					stampData.Target, stampData.Port, stampData.Sent, stampData.Received,
-					stampData.Loss, stampData.AvgRTT, stampData.MinRTT, stampData.MaxRTT,
-					stampData.P50RTT, stampData.P95RTT,
-				)
+				parsedAgentConfigId, err := processor_shared.UUID(payload.AgentConfigId)
+				if err != nil {
+					s.logger.ErrorContext(ctx, "failed to parse agent config id", log.Err(err))
+					_ = msg.Nak()
+					continue
+				}
+
+				_, err = s.query.InsertStampData(ctx, stampprocessor_db.InsertStampDataParams{
+					Timestamp: pgtype.Timestamptz{
+						Time:  payload.Payload.Timestamp,
+						Valid: true,
+					},
+					SerialID:      payload.SerialID,
+					Target:        stampData.Target,
+					Port:          int32(stampData.Port),
+					Sent:          int32(stampData.Sent),
+					Received:      int32(stampData.Received),
+					Loss:          stampData.Loss,
+					AvgRtt:        stampData.AvgRTT,
+					MinRtt:        stampData.MinRTT,
+					MaxRtt:        stampData.MaxRTT,
+					P50Rtt:        stampData.P50RTT,
+					P95Rtt:        stampData.P95RTT,
+					AgentConfigID: *parsedAgentConfigId,
+				})
+
 				if err != nil {
 					s.logger.ErrorContext(ctx, "failed to insert stamp data", log.Err(err))
 					_ = msg.Nak()

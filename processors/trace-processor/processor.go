@@ -238,7 +238,7 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			MeasurementID: measurement.ID,
 			Ip:            &hopIp,
 			Ttl:           int32(hop.ProbeTTL),
-			RttMs:         processor_shared.Float8(time.Duration(hop.Rtt) / time.Millisecond),
+			Rtt:           processor_shared.Int8(int64(hop.Rtt * float64(time.Millisecond))), // Converting milliseconds to nanoseconds to conform to standards
 			IcmpType:      processor_shared.Int4(hop.IcmpType),
 			IcmpCode:      processor_shared.Int4(hop.IcmpCode),
 			ReplyTtl:      processor_shared.Int4(hop.ReplyTTL),
@@ -253,7 +253,7 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			MeasurementID: measurement.ID,
 			Ip:            nil,
 			Ttl:           int32(hop.ProbeTTL),
-			RttMs:         pgtype.Float8{},
+			Rtt:           pgtype.Int8{},
 			IcmpType:      pgtype.Int4{},
 			IcmpCode:      pgtype.Int4{},
 			ReplyTtl:      pgtype.Int4{},

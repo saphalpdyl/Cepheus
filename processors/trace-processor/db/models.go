@@ -15,7 +15,7 @@ type TraceHop struct {
 	MeasurementID pgtype.UUID
 	Ip            *netip.Addr
 	Ttl           int32
-	RttMs         pgtype.Float8
+	Rtt           pgtype.Int8
 	IcmpType      pgtype.Int4
 	IcmpCode      pgtype.Int4
 	ReplyTtl      pgtype.Int4

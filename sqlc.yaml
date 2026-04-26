@@ -10,3 +10,12 @@ sql:
         package: "traceprocessor_db"
         out: "processors/trace-processor/db/"
         sql_package: "pgx/v5"
+  - engine: "postgresql"
+    queries: "db/queries/processors/stamp-processor/"
+    schema:
+      - "db/init/02-stamp.sql"
+    gen:
+      go:
+        package: "stampprocessor_db"
+        out: "processors/stamp-processor/db/"
+        sql_package: "pgx/v5"

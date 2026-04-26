@@ -13,7 +13,7 @@ import (
 )
 
 const getHopsByMeasurement = `-- name: GetHopsByMeasurement :many
-SELECT timestamp, measurement_id, ip, ttl, rtt_ms, icmp_type, icmp_code, reply_ttl, asn, is_no_hop FROM trace_hops
+SELECT timestamp, measurement_id, ip, ttl, rtt, icmp_type, icmp_code, reply_ttl, asn, is_no_hop FROM trace_hops
 WHERE measurement_id = $1
 ORDER BY ttl ASC
 `
@@ -32,7 +32,7 @@ func (q *Queries) GetHopsByMeasurement(ctx context.Context, measurementID pgtype
 			&i.MeasurementID,
 			&i.Ip,
 			&i.Ttl,
-			&i.RttMs,
+			&i.Rtt,
 			&i.IcmpType,
 			&i.IcmpCode,
 			&i.ReplyTtl,
@@ -101,7 +101,7 @@ type InsertTraceHopParams struct {
 	MeasurementID pgtype.UUID
 	Ip            *netip.Addr
 	Ttl           int32
-	RttMs         pgtype.Float8
+	Rtt           pgtype.Int8
 	IcmpType      pgtype.Int4
 	IcmpCode      pgtype.Int4
 	ReplyTtl      pgtype.Int4

@@ -26,7 +26,7 @@ CREATE TABLE trace_hops
     measurement_id UUID        NOT NULL REFERENCES trace_measurements (id) ON DELETE CASCADE,
     ip             INET,
     ttl            INT         NOT NULL,
-    rtt_ms         FLOAT,
+    rtt            BIGINT,
     icmp_type      INT,
     icmp_code      INT,
     reply_ttl      INT,

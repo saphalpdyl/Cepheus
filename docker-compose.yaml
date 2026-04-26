@@ -35,6 +35,9 @@ services:
   cepheus-server:
     image: cepheus-server:latest
     container_name: cepheus-server
+    build:
+      context: .
+      dockerfile: docker/cepheus-server.Dockerfile
     ports:
       - 8070:8080
     environment:
@@ -47,6 +50,9 @@ services:
   cepheus-stamp-processor:
     image: cepheus-stamp-processor:latest
     container_name: cepheus-stamp-processor
+    build:
+      context: .
+      dockerfile: docker/cepheus-stamp-processor.Dockerfile
     ports:
       - 8080:8080
     environment:
@@ -62,6 +68,9 @@ services:
   cepheus-trace-processor:
     image: cepheus-trace-processor:latest
     container_name: cepheus-trace-processor
+    build:
+      context: .
+      dockerfile: docker/cepheus-trace-processor.Dockerfile
     ports:
       - 8086:8080
     environment:

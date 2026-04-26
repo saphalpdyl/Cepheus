@@ -71,6 +71,7 @@ func (d *Dispatcher) Start(ctx context.Context, interval time.Duration) (err err
 				return
 			case data := <-d.probeDataStream.stream:
 				if data.ProbeType == "" {
+					d.logger.WarnContext(ctx, "Received an empty probe type")
 					break
 				}
 

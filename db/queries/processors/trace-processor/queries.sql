@@ -6,7 +6,7 @@ RETURNING *;
 
 -- name: InsertTraceHop :copyfrom
 INSERT INTO trace_hops
-    (timestamp, measurement_id, ip, ttl, rtt_ms, icmp_type, icmp_code, reply_ttl, asn, is_no_hop)
+    (timestamp, measurement_id, ip, ttl, rtt, icmp_type, icmp_code, reply_ttl, asn, is_no_hop)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
 -- name: GetMeasurementsByPath :many

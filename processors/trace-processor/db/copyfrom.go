@@ -33,7 +33,7 @@ func (r iteratorForInsertTraceHop) Values() ([]interface{}, error) {
 		r.rows[0].MeasurementID,
 		r.rows[0].Ip,
 		r.rows[0].Ttl,
-		r.rows[0].RttMs,
+		r.rows[0].Rtt,
 		r.rows[0].IcmpType,
 		r.rows[0].IcmpCode,
 		r.rows[0].ReplyTtl,
@@ -47,5 +47,5 @@ func (r iteratorForInsertTraceHop) Err() error {
 }
 
 func (q *Queries) InsertTraceHop(ctx context.Context, arg []InsertTraceHopParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"trace_hops"}, []string{"timestamp", "measurement_id", "ip", "ttl", "rtt_ms", "icmp_type", "icmp_code", "reply_ttl", "asn", "is_no_hop"}, &iteratorForInsertTraceHop{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"trace_hops"}, []string{"timestamp", "measurement_id", "ip", "ttl", "rtt", "icmp_type", "icmp_code", "reply_ttl", "asn", "is_no_hop"}, &iteratorForInsertTraceHop{rows: arg})
 }

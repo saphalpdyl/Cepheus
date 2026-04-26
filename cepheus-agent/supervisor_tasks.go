@@ -24,16 +24,6 @@ func (s *Supervisor) SetDesiredTasks(tasks []api.Task) {
 	s.reconcile(s.ctx)
 }
 
-// func (s *Supervisor) sendProbeToStream(ctx context.Context, data api.ProbeResult, task *RunningTask) {
-// 	select {
-// 	case s.probeDataStream <- data:
-// 	case <-ctx.Done():
-// 		return
-// 	default:
-// 		s.logger.WarnContext(ctx, "probe buffer full, dropping result", "task_id", task.Spec.TaskID)
-// 	}
-// }
-
 func (s *Supervisor) runOnce(ctx context.Context, rt *RunningTask) {
 	params, err := rt.Spec.ParseParams()
 	if err != nil {
