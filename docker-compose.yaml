@@ -143,6 +143,24 @@ services:
 
   # ----- Telemetry ----- 
 
+  # ----- Ephemeral Runners ----- 
+  cepheus-feeds-refresh-cloud-ranges:
+    container_name: cepheus-feeds-refresh-cloud-ranges
+    build:
+        context: .
+        dockerfile: docker/cepheus-feeds.runner.Dockerfile
+    volumes:
+      - ./feeds:/app
+    environment:
+      - DATABASE_URL=postgres://postgres:admin@db:5432/postgres?sslmode=disable
+      - MAX_AGE=1h
+    command: ["python", "refresh_cloud_ip_ranges.py"]
+    depends_on:
+        - db
+    restart: "no"
+    profiles: ["refresh-feeds"]
+  # ----- Ephemeral Runners ----- 
+
 volumes:
   tempo-data:
   loki-data:

@@ -1,4 +1,7 @@
-.PHONY: build dist ips apply db dev build-vm telemetry
+.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup
+
+# One time setup ( builds + fills feeds )
+setup: build build-vm refresh-cloud-ip-ranges
 
 # Host Related
 build:
@@ -60,3 +63,7 @@ sqlc-gen:
 # Personal
 sync:
 	rsync -rav . cepheus:/home/vagrant/cepheus/ --exclude-from=.rsyncignore
+
+# Manual refresh feeds
+refresh-cloud-ip-ranges:
+	docker compose --profile refresh-feeds run --build --rm cepheus-feeds-refresh-cloud-ranges
