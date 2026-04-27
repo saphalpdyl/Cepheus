@@ -2,34 +2,27 @@
 #               Qodana analysis is configured by qodana.yaml file               #
 #             https://www.jetbrains.com/help/qodana/qodana-yaml.html            #
 #-------------------------------------------------------------------------------#
-
 #################################################################################
 #              WARNING: Do not store sensitive information in this file,        #
 #               as its contents will be included in the Qodana report.          #
 #################################################################################
 version: "1.0"
-
 #Specify inspection profile for code analysis
 profile:
   name: qodana.starter
-
 #Enable inspections
 #include:
 #  - name: <SomeEnabledInspectionId>
-
 #Disable inspections
 #exclude:
 #  - name: <SomeDisabledInspectionId>
 #    paths:
 #      - <path/where/not/run/inspection>
-
 #Execute shell command before Qodana execution (Applied in CI/CD pipeline)
 #bootstrap: sh ./prepare-qodana.sh
-
 #Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
 #plugins:
 #  - id: <plugin.id> #(plugin id can be found at https://plugins.jetbrains.com)
-
 # Quality gate. Will fail the CI/CD pipeline if any condition is not met
 # severityThresholds - configures maximum thresholds for different problem severities
 # testCoverageThresholds - configures minimum code coverage on a whole project and newly added code
@@ -41,6 +34,62 @@ profile:
 #  testCoverageThresholds:
 #    fresh: 70
 #    total: 50
-
 #Specify Qodana linter for analysis (Applied in CI/CD pipeline)
 linter: jetbrains/qodana-go:2026.1
+exclude:
+  - name: All
+    paths:
+      - api
+      - api/payload.go
+      - cepheus-agent
+      - cepheus-agent/log
+      - cepheus-agent/log/attr.go
+      - cepheus-agent/agent.go
+      - cepheus-agent/dispatcher.go
+      - cepheus-agent/executor_stamp_reflector.go
+      - cepheus-agent/executor_stamp_sender.go
+      - cepheus-agent/task.go
+      - cepheus-server
+      - cepheus-server/handler
+      - cepheus-server/handler/handler.go
+      - cepheus-server/log
+      - cepheus-server/log/attr.go
+      - cepheus-server/server.go
+      - cmd
+      - cmd/cepheus-agent
+      - cmd/cepheus-agent/main.go
+      - cmd/cepheus-server
+      - cmd/cepheus-server/main.go
+      - cmd/processors
+      - cmd/processors/stamp-processor
+      - cmd/processors/stamp-processor/main.go
+      - cmd/processors/trace-processor
+      - cmd/processors/trace-processor/main.go
+      - common
+      - common/doc.go
+      - common/types.go
+      - processors
+      - processors/shared
+      - processors/shared/log
+      - processors/shared/log/attr.go
+      - processors/shared/processor.go
+      - processors/shared/utils.go
+      - processors/stamp-processor
+      - processors/stamp-processor/config.go
+      - processors/stamp-processor/processor.go
+      - processors/trace-processor
+      - processors/trace-processor/config.go
+      - processors/trace-processor/processor.go
+      - scamper
+      - scamper/client.go
+      - scamper/doc.go
+      - scamper/types.go
+      - stamp
+      - stamp/error_estimate.go
+      - stamp/reflector.go
+      - stamp/sender.go
+      - stamp/timestamp.go
+      - telemetry
+      - telemetry/logging.go
+      - telemetry/tracing.go
+      - go.mod

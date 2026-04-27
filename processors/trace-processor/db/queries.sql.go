@@ -12,6 +12,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getExistingIPs = `-- name: GetExistingIPs :many
+SELECT ip FROM as_details WHERE ip = ANY($1::inet[])
+`
+
+func (q *Queries) GetExistingIPs(ctx context.Context, ips []netip.Addr) ([]netip.Addr, error) {
+	rows, err := q.db.Query(ctx, getExistingIPs, ips)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []netip.Addr
+	for rows.Next() {
+		var ip netip.Addr
+		if err := rows.Scan(&ip); err != nil {
+			return nil, err
+		}
+		items = append(items, ip)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getHopsByMeasurement = `-- name: GetHopsByMeasurement :many
 SELECT timestamp, measurement_id, ip, ttl, rtt, icmp_type, icmp_code, reply_ttl, asn, is_no_hop FROM trace_hops
 WHERE measurement_id = $1
@@ -160,4 +184,12 @@ func (q *Queries) InsertTraceMeasurement(ctx context.Context, arg InsertTraceMea
 		&i.Raw,
 	)
 	return i, err
+}
+
+type UpsertAsDetailsParams struct {
+	Ip        netip.Addr
+	Asn       pgtype.Int4
+	BgpPrefix pgtype.Text
+	Name      pgtype.Text
+	Cc        pgtype.Text
 }

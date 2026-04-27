@@ -20,3 +20,11 @@ ORDER BY timestamp DESC;
 SELECT * FROM trace_hops
 WHERE measurement_id = $1
 ORDER BY ttl ASC;
+
+-- name: GetExistingIPs :many
+SELECT ip FROM as_details WHERE ip = ANY(@ips::inet[]);
+
+-- name: UpsertAsDetails :copyfrom
+INSERT INTO as_details
+    (ip, asn, bgp_prefix, name, cc)
+VALUES ($1, $2, $3, $4, $5);

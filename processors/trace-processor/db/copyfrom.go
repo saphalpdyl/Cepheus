@@ -49,3 +49,39 @@ func (r iteratorForInsertTraceHop) Err() error {
 func (q *Queries) InsertTraceHop(ctx context.Context, arg []InsertTraceHopParams) (int64, error) {
 	return q.db.CopyFrom(ctx, []string{"trace_hops"}, []string{"timestamp", "measurement_id", "ip", "ttl", "rtt", "icmp_type", "icmp_code", "reply_ttl", "asn", "is_no_hop"}, &iteratorForInsertTraceHop{rows: arg})
 }
+
+// iteratorForUpsertAsDetails implements pgx.CopyFromSource.
+type iteratorForUpsertAsDetails struct {
+	rows                 []UpsertAsDetailsParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForUpsertAsDetails) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForUpsertAsDetails) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].Ip,
+		r.rows[0].Asn,
+		r.rows[0].BgpPrefix,
+		r.rows[0].Name,
+		r.rows[0].Cc,
+	}, nil
+}
+
+func (r iteratorForUpsertAsDetails) Err() error {
+	return nil
+}
+
+func (q *Queries) UpsertAsDetails(ctx context.Context, arg []UpsertAsDetailsParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"as_details"}, []string{"ip", "asn", "bgp_prefix", "name", "cc"}, &iteratorForUpsertAsDetails{rows: arg})
+}

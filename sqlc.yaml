@@ -5,11 +5,17 @@ sql:
     queries: "db/queries/processors/trace-processor/"
     schema: 
       - "db/init/03-trace.sql"
+      - "db/init/05-as_details.sql"
     gen:
       go:
         package: "traceprocessor_db"
         out: "processors/trace-processor/db/"
         sql_package: "pgx/v5"
+        overrides:
+          - db_type: "inet"
+            go_type:
+              type: "Addr"
+              import: "net/netip"
   - engine: "postgresql"
     queries: "db/queries/processors/stamp-processor/"
     schema:

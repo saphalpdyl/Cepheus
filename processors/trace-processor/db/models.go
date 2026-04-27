@@ -10,6 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AsDetail struct {
+	Ip        netip.Addr
+	Asn       pgtype.Int4
+	Name      pgtype.Text
+	Cc        pgtype.Text
+	BgpPrefix pgtype.Text
+}
+
 type TraceHop struct {
 	Timestamp     pgtype.Timestamptz
 	MeasurementID pgtype.UUID

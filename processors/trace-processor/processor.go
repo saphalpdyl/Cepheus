@@ -12,10 +12,13 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+
+	asn "github.com/superfrink/go-cymru-asn"
 )
 
 type TraceProcessor struct {
@@ -26,6 +29,9 @@ type TraceProcessor struct {
 	logger *slog.Logger
 	pool   *pgxpool.Pool
 	query  *traceprocessor_db.Queries
+
+	// IP -> ASN mapper client
+	asnClient *asn.Client
 }
 
 func NewTraceProcessor(instanceId string, config TraceProcessorConfig, logger *slog.Logger) TraceProcessor {
@@ -33,6 +39,9 @@ func NewTraceProcessor(instanceId string, config TraceProcessorConfig, logger *s
 		InstanceId: instanceId,
 		logger:     logger,
 		config:     config,
+		asnClient: asn.NewClient(
+			asn.WithTimeout(time.Second * 5),
+		),
 	}
 }
 
@@ -223,6 +232,7 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 
 	// Generate trace hops
 	var traceHops []traceprocessor_db.InsertTraceHopParams
+	var hopIPs []netip.Addr
 	for _, hop := range traceDataPayload.Hops {
 		var hopIp netip.Addr
 		if hop.Addr != "" {
@@ -232,6 +242,9 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 				return err
 			}
 		}
+
+		// Used for feeds
+		hopIPs = append(hopIPs, hopIp)
 
 		traceHops = append(traceHops, traceprocessor_db.InsertTraceHopParams{
 			Timestamp:     pgtype.Timestamptz{Time: payload.Payload.Timestamp, Valid: true},
@@ -245,6 +258,16 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			Asn:           processor_shared.Int4(0),
 			IsNoHop:       false,
 		})
+	}
+
+	existingIPs, err := s.query.WithTx(tx).GetExistingIPs(ctx, hopIPs)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to query existing ips", log.Err(err))
+		return err
+	}
+
+	if err = s.enrichMissingHops(ctx, hopIPs, existingIPs, tx); err != nil {
+		return err
 	}
 
 	for _, hop := range traceDataPayload.NoHops {
@@ -273,5 +296,60 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		return err
 	}
 
+	return nil
+}
+
+func (s *TraceProcessor) enrichMissingHops(ctx context.Context, allIPs []netip.Addr, existingIPs []netip.Addr, tx pgx.Tx) error {
+	// Get non-existing IPs
+	existingIPsSet := make(map[netip.Addr]bool)
+	for _, ip := range existingIPs {
+		existingIPsSet[ip] = true
+	}
+
+	var missingIPs []string
+	for _, ip := range allIPs {
+		if !existingIPsSet[ip] {
+			missingIPs = append(missingIPs, ip.String())
+		}
+	}
+
+	asnResp, err := s.asnClient.Lookup(ctx, missingIPs)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to lookup missing ips", log.Err(err))
+		return err
+	}
+
+	var asDetails []traceprocessor_db.UpsertAsDetailsParams
+
+	for _, r := range asnResp.Results {
+		ip, err := netip.ParseAddr(r.IP)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to parse ip inside as lookup", log.Err(err))
+			return err
+		}
+
+		asDetails = append(asDetails, traceprocessor_db.UpsertAsDetailsParams{
+			Ip:  ip,
+			Asn: processor_shared.Int4(r.ASN),
+			BgpPrefix: pgtype.Text{
+				String: r.BGPPrefix,
+				Valid:  r.BGPPrefix != "NA",
+			},
+			Name: pgtype.Text{
+				String: r.ASName,
+				Valid:  r.ASName != "NA",
+			},
+			Cc: pgtype.Text{
+				String: r.CountryCode,
+				Valid:  r.CountryCode != "",
+			},
+		})
+	}
+
+	_, err = s.query.WithTx(tx).UpsertAsDetails(ctx, asDetails)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to update as details", log.Err(err))
+		return err
+	}
 	return nil
 }
