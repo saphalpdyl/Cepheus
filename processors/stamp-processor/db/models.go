@@ -8,7 +8,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type StampDatum struct {
+type StampMeasurement struct {
+	ID            pgtype.UUID
 	Timestamp     pgtype.Timestamptz
 	SerialID      string
 	AgentConfigID pgtype.UUID
@@ -17,9 +18,14 @@ type StampDatum struct {
 	Sent          int32
 	Received      int32
 	Loss          float64
-	AvgRtt        int64
-	MinRtt        int64
-	MaxRtt        int64
-	P50Rtt        int64
-	P95Rtt        int64
+}
+
+type StampProbe struct {
+	MeasurementID pgtype.UUID
+	Tx            pgtype.Timestamptz
+	IsLost        bool
+	Rx            pgtype.Timestamptz
+	Rtt           pgtype.Int8
+	ForwardDelay  pgtype.Int8
+	BackwardDelay pgtype.Int8
 }

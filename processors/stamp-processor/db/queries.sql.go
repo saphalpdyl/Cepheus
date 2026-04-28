@@ -11,60 +11,45 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const insertStampData = `-- name: InsertStampData :one
-INSERT INTO stamp_data
-(timestamp, serial_id, target, port, sent, received, loss, avg_rtt, min_rtt, max_rtt, p50_rtt, p95_rtt, agent_config_id)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, $13)
-RETURNING timestamp, serial_id, agent_config_id, target, port, sent, received, loss, avg_rtt, min_rtt, max_rtt, p50_rtt, p95_rtt
+const insertStampMeasurement = `-- name: InsertStampMeasurement :one
+INSERT INTO stamp_measurements (timestamp, serial_id, agent_config_id, target, port, sent, received, loss)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id
 `
 
-type InsertStampDataParams struct {
+type InsertStampMeasurementParams struct {
 	Timestamp     pgtype.Timestamptz
 	SerialID      string
+	AgentConfigID pgtype.UUID
 	Target        string
 	Port          int32
 	Sent          int32
 	Received      int32
 	Loss          float64
-	AvgRtt        int64
-	MinRtt        int64
-	MaxRtt        int64
-	P50Rtt        int64
-	P95Rtt        int64
-	AgentConfigID pgtype.UUID
 }
 
-func (q *Queries) InsertStampData(ctx context.Context, arg InsertStampDataParams) (StampDatum, error) {
-	row := q.db.QueryRow(ctx, insertStampData,
+func (q *Queries) InsertStampMeasurement(ctx context.Context, arg InsertStampMeasurementParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, insertStampMeasurement,
 		arg.Timestamp,
 		arg.SerialID,
+		arg.AgentConfigID,
 		arg.Target,
 		arg.Port,
 		arg.Sent,
 		arg.Received,
 		arg.Loss,
-		arg.AvgRtt,
-		arg.MinRtt,
-		arg.MaxRtt,
-		arg.P50Rtt,
-		arg.P95Rtt,
-		arg.AgentConfigID,
 	)
-	var i StampDatum
-	err := row.Scan(
-		&i.Timestamp,
-		&i.SerialID,
-		&i.AgentConfigID,
-		&i.Target,
-		&i.Port,
-		&i.Sent,
-		&i.Received,
-		&i.Loss,
-		&i.AvgRtt,
-		&i.MinRtt,
-		&i.MaxRtt,
-		&i.P50Rtt,
-		&i.P95Rtt,
-	)
-	return i, err
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+type InsertStampProbesParams struct {
+	MeasurementID pgtype.UUID
+	Tx            pgtype.Timestamptz
+	IsLost        bool
+	Rx            pgtype.Timestamptz
+	Rtt           pgtype.Int8
+	ForwardDelay  pgtype.Int8
+	BackwardDelay pgtype.Int8
 }

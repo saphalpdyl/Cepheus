@@ -136,31 +136,15 @@ func (s *StampProcessor) Start(ctx context.Context) error {
 					continue
 				}
 
-				parsedAgentConfigId, err := processor_shared.UUID(payload.AgentConfigId)
-				if err != nil {
-					s.logger.ErrorContext(ctx, "failed to parse agent config id", log.Err(err))
+				if err = s.insertStampData(
+					ctx,
+					payload.SerialID,
+					&payload.AgentConfigId,
+					stampData,
+				); err != nil {
 					_ = msg.Nak()
 					continue
 				}
-
-				_, err = s.query.InsertStampData(ctx, stampprocessor_db.InsertStampDataParams{
-					Timestamp: pgtype.Timestamptz{
-						Time:  payload.Payload.Timestamp,
-						Valid: true,
-					},
-					SerialID:      payload.SerialID,
-					Target:        stampData.Target,
-					Port:          int32(stampData.Port),
-					Sent:          int32(stampData.Sent),
-					Received:      int32(stampData.Received),
-					Loss:          stampData.Loss,
-					AvgRtt:        stampData.AvgRTT,
-					MinRtt:        stampData.MinRTT,
-					MaxRtt:        stampData.MaxRTT,
-					P50Rtt:        stampData.P50RTT,
-					P95Rtt:        stampData.P95RTT,
-					AgentConfigID: *parsedAgentConfigId,
-				})
 
 				if err != nil {
 					s.logger.ErrorContext(ctx, "failed to insert stamp data", log.Err(err))
@@ -179,6 +163,93 @@ func (s *StampProcessor) Start(ctx context.Context) error {
 	}()
 
 	<-ctx.Done()
+
+	return nil
+}
+
+func (s *StampProcessor) insertStampData(
+	ctx context.Context,
+	serialId string,
+	agentConfigId *string,
+	stampData common.StampData,
+) error {
+	parsedAgentConfigId := &pgtype.UUID{
+		Bytes: [16]byte{},
+		Valid: false,
+	}
+
+	if agentConfigId != nil {
+		var err error
+		parsedAgentConfigId, err = processor_shared.UUID(*agentConfigId)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to parse agent config id", log.Err(err))
+		}
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to start transaction", log.Err(err))
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Insert stamp measurement first
+	measurement, err := s.query.WithTx(tx).InsertStampMeasurement(ctx, stampprocessor_db.InsertStampMeasurementParams{
+		Timestamp:     pgtype.Timestamptz{Time: stampData.Timestamp, Valid: true},
+		SerialID:      serialId,
+		AgentConfigID: *parsedAgentConfigId,
+		Target:        stampData.Target,
+		Port:          int32(stampData.Port),
+		Sent:          int32(stampData.Sent),
+		Received:      int32(stampData.Received),
+		Loss:          stampData.Loss,
+	})
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to insert stamp measurement", log.Err(err))
+		return err
+	}
+
+	var stampProbesParams []stampprocessor_db.InsertStampProbesParams
+	for _, probe := range stampData.Probes {
+		stampProbesParams = append(stampProbesParams, stampprocessor_db.InsertStampProbesParams{
+			MeasurementID: pgtype.UUID{
+				Bytes: measurement.Bytes,
+				Valid: measurement.Valid,
+			},
+			Tx: pgtype.Timestamptz{
+				Time:  probe.Tx,
+				Valid: true,
+			},
+			IsLost: probe.IsLost,
+			Rx: pgtype.Timestamptz{
+				Time:  probe.Rx,
+				Valid: !probe.IsLost,
+			},
+			Rtt: pgtype.Int8{
+				Int64: int64(probe.Rtt),
+				Valid: !probe.IsLost,
+			},
+			ForwardDelay: pgtype.Int8{
+				Int64: int64(probe.ForwardDelay),
+				Valid: !probe.IsLost,
+			},
+			BackwardDelay: pgtype.Int8{
+				Int64: int64(probe.BackwardDelay),
+				Valid: !probe.IsLost,
+			},
+		})
+	}
+
+	_, err = s.query.WithTx(tx).InsertStampProbes(ctx, stampProbesParams)
+	if err != nil {
+		s.logger.ErrorContext(ctx, `failed to insert stamp measurement`, log.Err(err))
+		return err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		s.logger.ErrorContext(ctx, "failed to commit transaction", log.Err(err))
+		return err
+	}
 
 	return nil
 }

@@ -241,6 +241,7 @@ func (a *Agent) pullAgentConfiguration(ctx context.Context) error {
 
 			return err
 		},
+		retry.Context(ctx),
 		retry.Attempts(3),
 		retry.Delay(5*time.Second),
 	)
@@ -279,6 +280,10 @@ func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig,
 	if a.httpClient == nil {
 		a.httpClient = &http.Client{
 			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				DisableKeepAlives:     true,
+				ResponseHeaderTimeout: 10 * time.Second,
+			},
 		}
 	}
 

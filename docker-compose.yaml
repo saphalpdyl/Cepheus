@@ -88,7 +88,7 @@ services:
     container_name: cepheus-frontend
     build:
       context: ./frontend
-      dockerfile: docker/cepheus-frontend.Dockerfile
+      dockerfile: ../docker/cepheus-frontend.Dockerfile
     volumes:
       - ./frontend:/app
       - deps:/app/deps

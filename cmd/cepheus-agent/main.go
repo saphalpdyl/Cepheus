@@ -93,7 +93,12 @@ func main() {
 		ScamperBinPath:     scamperBinPath,
 		Logger:             slog.Default().With(log.Domain(log.DomainAgentSupervisor), log.SerialID(serialID)),
 	})
-	agent.Run(ctx)
+
+	err = agent.Run(ctx)
+	if err != nil {
+		slog.Error("error running agent", "error", err)
+		os.Exit(1)
+	}
 
 	slog.Info("shutting down")
 }

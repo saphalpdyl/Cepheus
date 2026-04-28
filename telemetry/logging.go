@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	slogmulti "github.com/samber/slog-multi"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
@@ -53,7 +54,27 @@ func SetupLogging(ctx context.Context, sink, endpoint, serviceName, instanceID s
 		inner: otelHandler,
 	}))
 
+	fileHandler, err := newFileHandler("/tmp/cepheus-agent.log")
+	if err != nil {
+		return nil, err
+	}
+
+	slog.SetDefault(slog.New(
+		slogmulti.Fanout(
+			otelHandler,
+			fileHandler,
+		),
+	))
+
 	return provider.Shutdown, nil
+}
+
+func newFileHandler(path string) (slog.Handler, error) {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+	return slog.NewJSONHandler(f, &slog.HandlerOptions{Level: slog.LevelInfo}), nil
 }
 
 // levelFilter wraps an slog.Handler and drops records below the configured level.

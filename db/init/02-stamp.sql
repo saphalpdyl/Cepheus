@@ -1,22 +1,38 @@
 -- Tables for STAMP data
-CREATE TABLE stamp_data
+
+CREATE TABLE IF NOT EXISTS stamp_measurements
 (
-    timestamp       TIMESTAMPTZ      NOT NULL,
-    serial_id       TEXT             NOT NULL REFERENCES device (serial_id) ON DELETE CASCADE,
-    agent_config_id UUID             REFERENCES agent_config (id) ON DELETE SET NULL,
-    target          TEXT             NOT NULL,
-    port            INTEGER          NOT NULL,
-    sent            INTEGER          NOT NULL,
-    received        INTEGER          NOT NULL,
-    loss            FLOAT NOT NULL,
-    avg_rtt         BIGINT NOT NULL,
-    min_rtt         BIGINT NOT NULL,
-    max_rtt         BIGINT NOT NULL,
-    p50_rtt         BIGINT NOT NULL,
-    p95_rtt         BIGINT NOT NULL
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    timestamp       TIMESTAMPTZ NOT NULL,
+    serial_id       TEXT       NOT NULL,
+    agent_config_id UUID       REFERENCES agent_config (id) ON DELETE SET NULL,
+    target          TEXT       NOT NULL,
+    port            INTEGER    NOT NULL,
+    sent            INTEGER    NOT NULL,
+    received        INTEGER    NOT NULL,
+    loss            FLOAT      NOT NULL
+
 );
 
-SELECT create_hypertable('stamp_data', 'timestamp');
+CREATE TABLE IF NOT EXISTS stamp_probes
+(
+    measurement_id UUID REFERENCES stamp_measurements(id) ON DELETE CASCADE,
+    tx             TIMESTAMPTZ NOT NULL,
+    is_lost        BOOLEAN    NOT NULL,
+    rx             TIMESTAMPTZ,
+    rtt            BIGINT,
+    forward_delay  BIGINT,
+    backward_delay BIGINT
+);
 
-CREATE INDEX ON stamp_data (serial_id, target, timestamp DESC);
-CREATE INDEX ON stamp_data (serial_id, timestamp DESC);
+
+SELECT create_hypertable('stamp_probes', 'tx');
+
+CREATE INDEX ON stamp_probes (measurement_id) WHERE is_lost = true;
+CREATE INDEX ON stamp_measurements (serial_id, timestamp DESC);
+CREATE INDEX ON stamp_measurements (agent_config_id);
+CREATE INDEX ON stamp_measurements (target, timestamp DESC);
+CREATE INDEX ON stamp_measurements (target, port, timestamp DESC);
+
+-- CREATE INDEX ON stamp_data (serial_id, target, timestamp DESC);
+-- CREATE INDEX ON stamp_data (serial_id, timestamp DESC);

@@ -44,7 +44,8 @@ topology:
         - ip link set eth3 up
         - sysctl -w net.ipv4.ip_forward=1
         - iptables -t nat -A POSTROUTING -o eth3 -j MASQUERADE
-        - sh -c '/opt/cepheus-agent/cepheus-agent security-appliance /opt/cepheus-agent/cepheus-agent.config.yaml &'
+        - sh -c '/opt/cepheus-agent/cepheus-agent security-appliance /opt/cepheus-agent/cepheus-agent.config.yaml >/proc/1/fd/1 2>/proc/1/fd/2 &'
+
 
     ap1:
       image: alpine:3.21
@@ -54,7 +55,7 @@ topology:
         - ip addr add 10.0.1.2/30 dev eth1
         - ip link set eth1 up
         - ip route add default via 10.0.1.1
-        - sh -c '/opt/cepheus-agent/cepheus-agent ap1 /opt/cepheus-agent/cepheus-agent.config.yaml &'
+        - sh -c '/opt/cepheus-agent/cepheus-agent ap1 /opt/cepheus-agent/cepheus-agent.config.yaml >/proc/1/fd/1 2>/proc/1/fd/2 &'
 
   links:
     - endpoints: ["ap1:eth1", "access-switch-01:eth1"]

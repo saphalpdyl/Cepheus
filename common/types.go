@@ -30,16 +30,22 @@ const (
 
 // STAMP Data
 type StampData struct {
-	Target   string  `json:"target"`
-	Port     int     `json:"port"`
-	Sent     int     `json:"sent"`
-	Received int     `json:"received"`
-	Loss     float64 `json:"loss"`
-	AvgRTT   int64   `json:"avg_rtt"`
-	MinRTT   int64   `json:"min_rtt"`
-	MaxRTT   int64   `json:"max_rtt"`
-	P50RTT   int64   `json:"p50_rtt"`
-	P95RTT   int64   `json:"p95_rtt"`
+	Target    string           `json:"target"`
+	Port      int              `json:"port"`
+	Sent      int              `json:"sent"`
+	Received  int              `json:"received"`
+	Loss      float64          `json:"loss"`
+	Probes    []StampProbeData `json:"probes"`
+	Timestamp time.Time        `json:"timestamp"`
+}
+
+type StampProbeData struct {
+	Tx            time.Time     `json:"tx,omitempty"`
+	IsLost        bool          `json:"is_lost"`
+	Rx            time.Time     `json:"rx,omitempty"`
+	Rtt           time.Duration `json:"rtt,omitempty"`
+	ForwardDelay  time.Duration `json:"forward_delay,omitempty"`
+	BackwardDelay time.Duration `json:"backward_delay,omitempty"`
 }
 
 // TraceRoute Data

@@ -313,6 +313,7 @@ func (s *TraceProcessor) enrichMissingHops(ctx context.Context, allIPs []netip.A
 		}
 	}
 
+	// TODO: Instead of this, lazily load in ASN Prefixes from RipeSTAT
 	asnResp, err := s.asnClient.Lookup(ctx, missingIPs)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to lookup missing ips", log.Err(err))

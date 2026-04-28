@@ -73,6 +73,11 @@ defmodule CepheusWeb.DashboardLive do
   defp fmt_loss(other), do: to_string(other)
 
   defp fmt_rtt(nil), do: "—"
-  defp fmt_rtt(n) when is_integer(n), do: Integer.to_string(n) <> " µs"
+
+  defp fmt_rtt(ns) when is_integer(ns) do
+    ms = ns / 1_000_000
+    :io_lib.format("~.2f ms", [ms]) |> IO.iodata_to_binary()
+  end
+
   defp fmt_rtt(other), do: to_string(other)
 end

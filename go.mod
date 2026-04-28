@@ -37,6 +37,9 @@ require (
 	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/samber/lo v1.53.0 // indirect
+	github.com/samber/slog-common v0.21.0 // indirect
+	github.com/samber/slog-multi v1.8.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/superfrink/go-cymru-asn v1.1.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect

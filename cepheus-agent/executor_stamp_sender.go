@@ -56,30 +56,75 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 		interval = 100 * time.Millisecond
 	}
 
-	rtts := make([]time.Duration, 0, count)
-	sent := 0
+	probes := make([]common.StampProbeData, 0, count)
+	received := 0
+
+	startTimestamp := time.Now()
 
 	for i := 0; i < count; i++ {
 		if ctx.Err() != nil {
-			// Compute from whatever we have collected, sent >= half of Packetcount
-			if sent < (p.PacketCount / 2) {
-				return common.ProbeResult{}, nil
-			}
-			return computeProbeResult(rtts, spec, sent, p), ctx.Err()
+			return common.ProbeResult{}, ctx.Err()
 		}
 
+		// Used by lost probes as a reference for timestamp when stampPacket.SenderTimestamp is not available
+		startTimestamp := time.Now()
 		pkt, err := sender.Send()
 		t4 := time.Now()
-		sent++
+
 		if err != nil {
+			// Packet lost
+			// TODO: Implement a check for error type in the future instead of an assumption
+			// 		that every failure is a timeout error
+
+			probes = append(probes, common.StampProbeData{
+				Tx:            startTimestamp,
+				IsLost:        true,
+				Rx:            time.Time{},
+				Rtt:           0,
+				ForwardDelay:  0,
+				BackwardDelay: 0,
+			})
+
 			e.logger.DebugContext(ctx, "stamp packet failed", "seq", i, "err", err)
 		} else {
-			rtt, err := computeRTT(pkt, t4, e.stampConfig.ErrorEstimate.ClockFormat)
+			received++
+
+			// t1: STAMP Packet sent
+			// t2: Reflector receives STAMP packet
+			// t3: Reflector sends out STAMP packet
+			// t4: Sender receives reflector enriched STAMP packet
+
+			t1, err := pkt.SenderTimestamp.ToTime(e.stampConfig.ErrorEstimate.ClockFormat)
 			if err != nil {
-				e.logger.ErrorContext(ctx, "error computing RTT for sender")
+				e.logger.ErrorContext(ctx, "stamp sender error", "err", err)
 				return common.ProbeResult{}, err
 			}
-			rtts = append(rtts, *rtt)
+
+			t2, err := pkt.ReceiveTimestamp.ToTime(e.stampConfig.ErrorEstimate.ClockFormat)
+			if err != nil {
+				e.logger.ErrorContext(ctx, "stamp receive error", "seq", i, "err", err)
+				return common.ProbeResult{}, err
+			}
+
+			t3, err := pkt.Timestamp.ToTime(e.stampConfig.ErrorEstimate.ClockFormat)
+			if err != nil {
+				e.logger.ErrorContext(ctx, "stamp receive error", "seq", i, "err", err)
+				return common.ProbeResult{}, err
+			}
+
+			forwardDelay := t2.Sub(*t1)
+			backwardDelay := t4.Sub(*t3)
+			rtt := t4.Sub(*t1) - t3.Sub(*t2)
+
+			probes = append(probes, common.StampProbeData{
+				Tx:            *t1,
+				IsLost:        false,
+				Rx:            t4,
+				Rtt:           rtt,
+				ForwardDelay:  forwardDelay,
+				BackwardDelay: backwardDelay,
+			})
+
 		}
 
 		if i < count-1 {
@@ -91,81 +136,27 @@ func (e *StampSenderExecutor) Execute(ctx context.Context, params api.TaskParams
 		}
 	}
 
-	return computeProbeResult(rtts, spec, sent, p), nil
-}
-
-func computeProbeResult(rtts []time.Duration, spec *api.Task, sent int, p *api.AgentTaskStampSenderParams) common.ProbeResult {
-	stats := computeRTTStats(rtts)
-	data := common.StampData{
-		Target:   p.Target,
-		Port:     p.TargetPort,
-		Sent:     sent,
-		Received: len(rtts),
-		Loss:     float64(sent-len(rtts)) / float64(sent),
-		AvgRTT:   int64(stats.Avg),
-		MinRTT:   int64(stats.Min),
-		MaxRTT:   int64(stats.Max),
-		P50RTT:   int64(stats.P50),
-		P95RTT:   int64(stats.P95),
+	stampData := common.StampData{
+		Target:    p.Target,
+		Port:      p.TargetPort,
+		Sent:      len(probes),
+		Received:  received,
+		Loss:      float64(len(probes)-received) / float64(len(probes)),
+		Probes:    probes,
+		Timestamp: startTimestamp,
 	}
 
-	stampData, _ := json.Marshal(data)
+	marshaledStampData, err := json.Marshal(&stampData)
+	if err != nil {
+		e.logger.ErrorContext(ctx, "stamp marshal error", "err", err)
+		return common.ProbeResult{}, err
+	}
 
 	return common.ProbeResult{
 		TaskID:    spec.TaskID,
 		ProbeType: common.ProbeTypeStamp,
 		Kind:      string(spec.Type),
 		Timestamp: time.Now(),
-		Data:      stampData,
-	}
-}
-
-func computeRTT(pkt *stamp.ReflectorPacket, t4 time.Time, clockFormat stamp.TimestampClockFormat) (*time.Duration, error) {
-	t1, err := pkt.SenderTimestamp.ToTime(clockFormat)
-	if err != nil {
-		return nil, err
-	}
-	t2, err := pkt.ReceiveTimestamp.ToTime(clockFormat)
-	if err != nil {
-		return nil, err
-	}
-
-	t3, err := pkt.Timestamp.ToTime(clockFormat)
-	if err != nil {
-		return nil, err
-	}
-
-	rtt := t4.Sub(*t1) - t3.Sub(*t2)
-	return &rtt, nil
-}
-
-type rttStats struct {
-	Avg, Min, Max, P50, P95 time.Duration
-}
-
-func computeRTTStats(rtts []time.Duration) rttStats {
-	if len(rtts) == 0 {
-		return rttStats{}
-	}
-
-	sorted := make([]time.Duration, len(rtts))
-	copy(sorted, rtts)
-	for i := 1; i < len(sorted); i++ {
-		for j := i; j > 0 && sorted[j-1] > sorted[j]; j-- {
-			sorted[j-1], sorted[j] = sorted[j], sorted[j-1]
-		}
-	}
-
-	var sum time.Duration
-	for _, r := range sorted {
-		sum += r
-	}
-
-	return rttStats{
-		Avg: sum / time.Duration(len(sorted)),
-		Min: sorted[0],
-		Max: sorted[len(sorted)-1],
-		P50: sorted[len(sorted)*50/100],
-		P95: sorted[len(sorted)*95/100],
-	}
+		Data:      marshaledStampData,
+	}, nil
 }

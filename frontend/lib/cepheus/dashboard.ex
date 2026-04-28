@@ -80,33 +80,61 @@ defmodule Cepheus.Dashboard do
 
     # Window is interpolated as a literal — guarded by valid_window?/1 above.
     sql = """
-    SELECT target,
-           AVG(avg_rtt)::BIGINT AS avg_rtt,
-           SUM(sent)            AS total_sent,
-           SUM(received)        AS total_received,
-           AVG(loss)            AS avg_loss,
-           COUNT(*)             AS samples,
-           MAX(timestamp)       AS last_seen
-    FROM stamp_data
-    WHERE serial_id = $1
-      AND timestamp > NOW() - INTERVAL '#{window}'
-    GROUP BY target
-    ORDER BY target
+    SELECT m.target,
+           AVG(p.rtt) FILTER (WHERE NOT p.is_lost)::BIGINT       AS avg_rtt,
+           MIN(p.rtt) FILTER (WHERE NOT p.is_lost)               AS min_rtt,
+           MAX(p.rtt) FILTER (WHERE NOT p.is_lost)               AS max_rtt,
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY p.rtt)
+             FILTER (WHERE NOT p.is_lost)                        AS p50_rtt,
+           PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY p.rtt)
+             FILTER (WHERE NOT p.is_lost)                        AS p95_rtt,
+           COUNT(*)                                              AS total_probes,
+           COUNT(*) FILTER (WHERE NOT p.is_lost)                 AS received_probes,
+           (COUNT(*) FILTER (WHERE p.is_lost))::float
+             / NULLIF(COUNT(*), 0)                               AS loss,
+           COUNT(DISTINCT m.id)                                  AS measurements,
+           MAX(p.tx)                                             AS last_seen
+    FROM stamp_measurements m
+    JOIN stamp_probes p ON p.measurement_id = m.id
+    WHERE m.serial_id = $1
+      AND p.tx > NOW() - INTERVAL '#{window}'
+    GROUP BY m.target
+    ORDER BY m.target
     """
 
     %Postgrex.Result{rows: rows} =
       Ecto.Adapters.SQL.query!(Repo, sql, [serial_id])
 
-    Enum.map(rows, fn [target, avg_rtt, total_sent, total_received, avg_loss, samples, last_seen] ->
+    Enum.map(rows, fn [
+                        target,
+                        avg_rtt,
+                        min_rtt,
+                        max_rtt,
+                        p50_rtt,
+                        p95_rtt,
+                        total_probes,
+                        received_probes,
+                        loss,
+                        measurements,
+                        last_seen
+                      ] ->
       %{
         target: target,
-        avg_rtt_us: avg_rtt,
-        avg_loss: avg_loss,
-        samples: samples,
-        last_seen: last_seen,
-        total_sent: total_sent,
-        total_received: total_received,
+        avg_rtt_ns: avg_rtt,
+        min_rtt_ns: min_rtt,
+        max_rtt_ns: max_rtt,
+        p50_rtt_ns: trunc_or_nil(p50_rtt),
+        p95_rtt_ns: trunc_or_nil(p95_rtt),
+        total_probes: total_probes,
+        received_probes: received_probes,
+        loss: loss,
+        measurements: measurements,
+        last_seen: last_seen
       }
     end)
   end
+
+  defp trunc_or_nil(nil), do: nil
+  defp trunc_or_nil(n) when is_float(n), do: trunc(n)
+  defp trunc_or_nil(n), do: n
 end

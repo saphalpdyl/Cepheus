@@ -79,22 +79,24 @@
         <thead class="text-left opacity-70">
           <tr>
             <th class="py-1 pr-4">target</th>
-            <th class="py-1 pr-4">Total sent</th>
-            <th class="py-1 pr-4">Total received</th>
+            <th class="py-1 pr-4">probes</th>
             <th class="py-1 pr-4">avg rtt</th>
-            <th class="py-1 pr-4">avg loss</th>
-            <th class="py-1 pr-4">samples</th>
+            <th class="py-1 pr-4">p50</th>
+            <th class="py-1 pr-4">p95</th>
+            <th class="py-1 pr-4">loss</th>
+            <th class="py-1 pr-4">batches</th>
             <th class="py-1">last seen</th>
           </tr>
         </thead>
         <tbody>
           <tr :for={r <- rtts} class="border-t">
             <td class="py-1 pr-4 font-mono">{r.target}</td>
-            <td class="py-1 pr-4 font-mono">{r.total_sent}</td>
-            <td class="py-1 pr-4 font-mono">{r.total_received}</td>
-            <td class="py-1 pr-4">{fmt_rtt(r.avg_rtt_us)}</td>
-            <td class="py-1 pr-4">{fmt_loss(r.avg_loss)}</td>
-            <td class="py-1 pr-4">{r.samples}</td>
+            <td class="py-1 pr-4 font-mono">{r.received_probes}/{r.total_probes}</td>
+            <td class="py-1 pr-4">{fmt_rtt(r.avg_rtt_ns)}</td>
+            <td class="py-1 pr-4">{fmt_rtt(r.p50_rtt_ns)}</td>
+            <td class="py-1 pr-4">{fmt_rtt(r.p95_rtt_ns)}</td>
+            <td class="py-1 pr-4">{fmt_loss(r.loss)}</td>
+            <td class="py-1 pr-4">{r.measurements}</td>
             <td class="py-1">{fmt_dt(r.last_seen)}</td>
           </tr>
         </tbody>
