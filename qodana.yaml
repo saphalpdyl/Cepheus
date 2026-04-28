@@ -41,14 +41,14 @@ exclude:
     paths:
       - api
       - api/payload.go
-      - cepheus-agent
-      - cepheus-agent/log
-      - cepheus-agent/log/attr.go
-      - cepheus-agent/agent.go
-      - cepheus-agent/dispatcher.go
-      - cepheus-agent/executor_stamp_reflector.go
-      - cepheus-agent/executor_stamp_sender.go
-      - cepheus-agent/task.go
+      - agent
+      - agent/log
+      - agent/log/attr.go
+      - agent/agent.go
+      - agent/dispatcher.go
+      - agent/executor_stamp_reflector.go
+      - agent/executor_stamp_sender.go
+      - agent/task.go
       - server
       - server/handler
       - server/handler/handler.go

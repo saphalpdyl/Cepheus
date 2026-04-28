@@ -38,7 +38,7 @@ topology:
       binds:
         - conf/routers/small-retail-store/security-appliance/frr.conf:/etc/frr/frr.conf
         - conf/routers/small-retail-store/security-appliance/daemons:/etc/frr/daemons
-        - ../dist/cepheus-agent:/opt/cepheus-agent
+        - ../dist/agent:/opt/cepheus-agent
       exec:
         - ip addr add 192.168.121.100/24 dev eth3
         - ip link set eth3 up
@@ -50,12 +50,12 @@ topology:
     ap1:
       image: alpine:3.21
       binds:
-        - ../dist/cepheus-agent:/opt/cepheus-agent
+        - ../dist/agent:/opt/cepheus-agent
       exec:
         - ip addr add 10.0.1.2/30 dev eth1
         - ip link set eth1 up
         - ip route add default via 10.0.1.1
-        - sh -c '/opt/cepheus-agent/cepheus-agent ap1 /opt/cepheus-agent/cepheus-agent.config.yaml >/proc/1/fd/1 2>/proc/1/fd/2 &'
+        - sh -c '/opt/agent/cepheus-agent ap1 /opt/cepheus-agent/cepheus-agent.config.yaml >/proc/1/fd/1 2>/proc/1/fd/2 &'
 
   links:
     - endpoints: ["ap1:eth1", "access-switch-01:eth1"]
