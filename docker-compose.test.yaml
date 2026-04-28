@@ -13,8 +13,8 @@ services:
     privileged: true
     volumes:
       - type: bind
-        source: ./dist/cepheus-agent/
-        target: /opt/cepheus-agent/
+        source: ./dist/agent/
+        target: /opt/agent/
       - type: bind
         source: .
         target: /app

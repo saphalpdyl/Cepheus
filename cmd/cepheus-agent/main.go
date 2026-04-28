@@ -1,8 +1,8 @@
 package main
 
 import (
-	cepheusagent "cepheus/cepheus-agent"
-	"cepheus/cepheus-agent/log"
+	cepheusagent "cepheus/agent"
+	"cepheus/agent/log"
 	telemetry "cepheus/telemetry"
 	"context"
 	"log/slog"
@@ -20,7 +20,7 @@ func main() {
 	ctx := context.Background()
 
 	serialID := ""
-	cfgPath := "cepheus-agent.config.yaml"
+	cfgPath := "agent.config.yaml"
 	scamperBinPath := ""
 
 	if len(os.Args) > 1 {
@@ -68,14 +68,14 @@ func main() {
 		panic("sink == otel requires otel_collector_url to be non-empty")
 	}
 
-	logShutdown, err := telemetry.SetupLogging(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "cepheus-agent", "", false, attribute.String("serial_id", serialID))
+	logShutdown, err := telemetry.SetupLogging(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "agent", "", false, attribute.String("serial_id", serialID))
 	if err != nil {
 		slog.Error("failed to setup logging", "error", err)
 		os.Exit(1)
 	}
 	defer logShutdown(ctx)
 
-	traceShutdown, err := telemetry.SetupTracing(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "cepheus-agent", "", false, attribute.String("serial_id", serialID))
+	traceShutdown, err := telemetry.SetupTracing(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "agent", "", false, attribute.String("serial_id", serialID))
 	if err != nil {
 		slog.Error("failed to setup tracing", "error", err)
 		os.Exit(1)

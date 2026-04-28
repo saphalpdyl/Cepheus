@@ -1,8 +1,8 @@
-package cepheusagent
+package agent
 
 import (
+	"cepheus/agent/log"
 	"cepheus/api"
-	"cepheus/cepheus-agent/log"
 	"cepheus/scamper"
 	goscamper "cepheus/scamper"
 	"cepheus/stamp"
@@ -23,7 +23,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 )
 
-// The control/management plane for cepheus-agent
+// The control/management plane for agent
 // - Connects to the control plane (cepheus-server), and resolves configuration
 // - Manages lifecycle of probes in goroutines, and restarts them if they fail
 // - Reports batched probe results to the control plane at assigned intervals

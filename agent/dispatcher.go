@@ -1,9 +1,9 @@
 // Dispatcher that listen to the probeDataStream and publishes immediately to NATS
 // The previous implementation used to have batching enabled but this didn't seem significant enough
-package cepheusagent
+package agent
 
 import (
-	"cepheus/cepheus-agent/log"
+	"cepheus/agent/log"
 	"cepheus/common"
 	"cepheus/telemetry"
 	"context"

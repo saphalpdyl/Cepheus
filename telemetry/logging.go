@@ -54,7 +54,7 @@ func SetupLogging(ctx context.Context, sink, endpoint, serviceName, instanceID s
 		inner: otelHandler,
 	}))
 
-	fileHandler, err := newFileHandler("/tmp/cepheus-agent.log")
+	fileHandler, err := newFileHandler("/tmp/agent.log")
 	if err != nil {
 		return nil, err
 	}

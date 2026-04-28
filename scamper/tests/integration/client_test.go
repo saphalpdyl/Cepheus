@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const scamperBinPath = "/opt/cepheus-agent/scamper"
+const scamperBinPath = "/opt/agent/scamper"
 
 func newClient(t *testing.T, ctx context.Context) *scamper.ScamperClient {
 	t.Helper()

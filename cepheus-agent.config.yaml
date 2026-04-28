@@ -1,4 +1,4 @@
-# Default config for cepheus-agent
+# Default config for agent
 control_plane: 
   url: http://192.168.121.1:8070
   config_endpoint: /api/v1/devices/config/

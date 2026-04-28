@@ -1,8 +1,8 @@
-package cepheusagent
+package agent
 
 import (
+	"cepheus/agent/log"
 	"cepheus/api"
-	"cepheus/cepheus-agent/log"
 	"context"
 	"encoding/json"
 	"fmt"

@@ -1,4 +1,4 @@
-package cepheusagent
+package agent
 
 type ControlPlaneConfig struct {
 	ControlPlane struct {

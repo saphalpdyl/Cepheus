@@ -1,4 +1,4 @@
-package cepheusagent
+package agent
 
 import (
 	"cepheus/common"
