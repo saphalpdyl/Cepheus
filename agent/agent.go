@@ -24,7 +24,7 @@ import (
 )
 
 // The control/management plane for agent
-// - Connects to the control plane (cepheus-server), and resolves configuration
+// - Connects to the control plane (server), and resolves configuration
 // - Manages lifecycle of probes in goroutines, and restarts them if they fail
 // - Reports batched probe results to the control plane at assigned intervals
 

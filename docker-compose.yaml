@@ -34,7 +34,7 @@ services:
 
   cepheus-server:
     image: cepheus-server:latest
-    container_name: cepheus-server
+    container_name: server
     build:
       context: .
       dockerfile: docker/cepheus-server.Dockerfile

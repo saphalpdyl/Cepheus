@@ -1,4 +1,4 @@
-# Default configuration for cepheus-server.config.yaml
+# Default configuration for server.config.yaml
 listen: ":8080"
 telemetry:
   sink: otel

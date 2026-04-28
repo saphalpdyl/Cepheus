@@ -1,7 +1,7 @@
 package handler
 
 import (
-	logattr "cepheus/cepheus-server/log"
+	logattr "cepheus/server/log"
 	"encoding/json"
 	"log/slog"
 	"net/http"

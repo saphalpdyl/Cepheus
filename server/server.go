@@ -1,7 +1,7 @@
-package cepheusserver
+package server
 
 import (
-	"cepheus/cepheus-server/handler"
+	"cepheus/server/handler"
 	"context"
 	"net/http"
 

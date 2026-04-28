@@ -9,11 +9,11 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 go build -o /bin/cepheus-server ./cmd/cepheus-server
+RUN CGO_ENABLED=0 go build -o /bin/server ./cmd/server
 
 FROM alpine:3.21
 
-COPY --from=build /bin/cepheus-server /usr/local/bin/cepheus-server
+COPY --from=build /bin/server /usr/local/bin/cepheus-server
 
 WORKDIR /app
 COPY --from=build /src/cepheus-server.config.yaml /app/cepheus-server.config.yaml

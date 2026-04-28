@@ -49,12 +49,12 @@ exclude:
       - cepheus-agent/executor_stamp_reflector.go
       - cepheus-agent/executor_stamp_sender.go
       - cepheus-agent/task.go
-      - cepheus-server
-      - cepheus-server/handler
-      - cepheus-server/handler/handler.go
-      - cepheus-server/log
-      - cepheus-server/log/attr.go
-      - cepheus-server/server.go
+      - server
+      - server/handler
+      - server/handler/handler.go
+      - server/log
+      - server/log/attr.go
+      - server/server.go
       - cmd
       - cmd/cepheus-agent
       - cmd/cepheus-agent/main.go

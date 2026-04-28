@@ -1,4 +1,4 @@
-package cepheusserver
+package server
 
 type Config struct {
 	Listen    string `yaml:"listen"`

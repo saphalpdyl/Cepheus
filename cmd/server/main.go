@@ -1,11 +1,11 @@
-// Control-plane = cepheus-server
+// Control-plane = server
 
 package main
 
 import (
-	cepheusserver "cepheus/cepheus-server"
-	logattr "cepheus/cepheus-server/log"
 	"cepheus/common"
+	cepheusserver "cepheus/server"
+	logattr "cepheus/server/log"
 	"cepheus/telemetry"
 	"context"
 	"log/slog"
@@ -26,7 +26,7 @@ func log() *slog.Logger {
 func main() {
 	ctx := context.Background()
 
-	cfgPath := "cepheus-server.config.yaml"
+	cfgPath := "server.config.yaml"
 	if len(os.Args) > 1 {
 		cfgPath = os.Args[1]
 	}
@@ -51,14 +51,14 @@ func main() {
 		panic("sink == otel requires otel_collector_url to be non-empty")
 	}
 
-	logShutdown, err := telemetry.SetupLogging(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "cepheus-server", "", false)
+	logShutdown, err := telemetry.SetupLogging(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "server", "", false)
 	if err != nil {
 		slog.Error("failed to setup logging", "error", err)
 		os.Exit(1)
 	}
 	defer logShutdown(ctx)
 
-	traceShutdown, err := telemetry.SetupTracing(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "cepheus-server", "", false)
+	traceShutdown, err := telemetry.SetupTracing(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "server", "", false)
 	if err != nil {
 		slog.Error("failed to setup tracing", "error", err)
 		os.Exit(1)

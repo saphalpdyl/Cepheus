@@ -2,7 +2,7 @@ package handler
 
 import (
 	"cepheus/api"
-	logattr "cepheus/cepheus-server/log"
+	logattr "cepheus/server/log"
 	"cepheus/telemetry"
 	"encoding/json"
 	"fmt"
