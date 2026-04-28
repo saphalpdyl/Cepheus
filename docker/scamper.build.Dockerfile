@@ -20,4 +20,4 @@ RUN make LDFLAGS="-all-static -Wl,--allow-multiple-definition"
 
 FROM scratch
 ARG SCAMPER_VERSION
-COPY --from=builder /src/scamper-cvs-${SCAMPER_VERSION}/scamper/scamper /cepheus-agent/scamper
+COPY --from=builder /src/scamper-cvs-${SCAMPER_VERSION}/scamper/scamper /agent/scamper

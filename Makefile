@@ -51,6 +51,7 @@ test.build:
 	docker build --output type=local,dest=dist/ -f docker/scamper.build.Dockerfile .
 
 test.integration: test.build
+	docker compose -f docker-compose.test.yaml down
 	docker compose -f docker-compose.test.yaml up -d
 	go test -v -tags integration ./stamp/tests/integration
 	docker compose -f docker-compose.test.yaml exec scamper-test-suite go test -v -tags integration /app/scamper-client/tests/integration
