@@ -8,7 +8,7 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 go build -o /bin/cepheus-trace-processor ./cmd/processors/trace-processor
+RUN CGO_ENABLED=0 go build -o /bin/cepheus-trace-processor ./cmd/trace-processor
 
 FROM alpine:3.21
 

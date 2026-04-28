@@ -2,9 +2,8 @@ package traceprocessor
 
 import (
 	"cepheus/common"
-	processor_shared "cepheus/processors/shared"
-	"cepheus/processors/shared/log"
-	traceprocessor_db "cepheus/processors/trace-processor/db"
+	processor_shared "cepheus/common/pgx"
+	traceprocessor_db "cepheus/trace-processor/db"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,6 +16,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+
+	log "cepheus/trace-processor/log"
 
 	asn "github.com/superfrink/go-cymru-asn"
 )

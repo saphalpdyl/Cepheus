@@ -1,4 +1,4 @@
-package processor_shared
+package pgx
 
 import (
 	"github.com/google/uuid"

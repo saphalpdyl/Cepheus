@@ -2,9 +2,8 @@ package stampprocessor
 
 import (
 	"cepheus/common"
-	processor_shared "cepheus/processors/shared"
-	"cepheus/processors/shared/log"
-	stampprocessor_db "cepheus/processors/stamp-processor/db"
+	processor_shared "cepheus/common/pgx"
+	stampprocessor_db "cepheus/stamp-processor/db"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+
+	log "cepheus/stamp-processor/log"
 )
 
 type StampProcessor struct {

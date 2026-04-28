@@ -1,9 +1,9 @@
 package main
 
 import (
-	"cepheus/processors/shared/log"
-	stampprocessor "cepheus/processors/stamp-processor"
 	"cepheus/telemetry"
+	traceprocessor "cepheus/trace-processor"
+	log "cepheus/trace-processor/log"
 	"context"
 	"crypto/rand"
 	"fmt"
@@ -22,16 +22,16 @@ func main() {
 	serviceInstanceId := fmt.Sprintf("%x", b)
 
 	// Get config
-	config := stampprocessor.GetConfig()
+	config := traceprocessor.GetConfig()
 
-	logShutdown, err := telemetry.SetupLogging(ctx, config.OtelSink, config.OtelEndpoint, "stamp-processor", serviceInstanceId, false)
+	logShutdown, err := telemetry.SetupLogging(ctx, config.OtelSink, config.OtelEndpoint, "trace-processor", serviceInstanceId, false)
 	if err != nil {
 		slog.Error("failed to setup logging", "error", err)
 		os.Exit(1)
 	}
 	defer logShutdown(ctx)
 
-	traceShutdown, err := telemetry.SetupTracing(ctx, config.OtelSink, config.OtelEndpoint, "stamp-processor", serviceInstanceId, false)
+	traceShutdown, err := telemetry.SetupTracing(ctx, config.OtelSink, config.OtelEndpoint, "trace-processor", serviceInstanceId, false)
 	if err != nil {
 		slog.Error("failed to setup tracing", "error", err)
 		os.Exit(1)
@@ -41,18 +41,18 @@ func main() {
 	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	slog.InfoContext(ctx, "starting the processor")
+	slog.InfoContext(ctx, "starting trace processor")
 
-	processor := stampprocessor.NewStampProcessor(
+	processor := traceprocessor.NewTraceProcessor(
 		serviceInstanceId,
 		config,
 		slog.Default().With(log.Domain(log.DomainProcessorLifecycle)),
 	)
 
 	err = processor.Start(ctx)
-
 	if err != nil {
-		slog.ErrorContext(ctx, "error while starting server", log.Err(err))
+		slog.ErrorContext(ctx, "failed to start trace processor", log.Err(err))
+		os.Exit(1)
 	}
 
 	slog.InfoContext(ctx, "shutting down")
