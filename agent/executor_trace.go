@@ -3,7 +3,7 @@ package agent
 import (
 	"cepheus/api"
 	"cepheus/common"
-	goscamper "cepheus/scamper"
+	goscamper "cepheus/scamper-client"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -29,12 +29,12 @@ func NewTraceExecutor(
 func (e *TraceExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (common.ProbeResult, error) {
 	p, ok := params.(*api.AgentTaskTraceParams)
 	if !ok {
-		return common.ProbeResult{}, fmt.Errorf("scamper-trace: expected AgentTaskTraceParams, got %T", params)
+		return common.ProbeResult{}, fmt.Errorf("scamper-client-trace: expected AgentTaskTraceParams, got %T", params)
 	}
 
 	resCh, err := e.scamper.Send(fmt.Sprintf("trace -P %s %s", string(p.Method), p.Target))
 	if err != nil {
-		return common.ProbeResult{}, fmt.Errorf("scamper-trace: failed to send trace command: %w", err)
+		return common.ProbeResult{}, fmt.Errorf("scamper-client-trace: failed to send trace command: %w", err)
 	}
 
 	select {

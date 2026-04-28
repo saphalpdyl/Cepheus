@@ -3,7 +3,7 @@
 package integration_test
 
 import (
-	"cepheus/scamper"
+	"cepheus/scamper-client"
 	"context"
 	"testing"
 	"time"
@@ -12,16 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const scamperBinPath = "/opt/agent/scamper"
+const scamperBinPath = "/opt/agent/scamper-client"
 
-func newClient(t *testing.T, ctx context.Context) *scamper.ScamperClient {
+func newClient(t *testing.T, ctx context.Context) *scamper_client.ScamperClient {
 	t.Helper()
 
-	client, err := scamper.NewClient(scamper.ScamperClientConfig{
+	client, err := scamper_client.NewClient(scamper_client.ScamperClientConfig{
 		BinPath: scamperBinPath,
 		PPS:     100,
 		Window:  10,
-		Format:  scamper.ScamperFormatWarts,
+		Format:  scamper_client.ScamperFormatWarts,
 	})
 	require.NoError(t, err)
 
@@ -64,7 +64,7 @@ func TestClient_ConcurrentTraces(t *testing.T) {
 	client := newClient(t, ctx)
 
 	targets := []string{"1.1.1.1", "8.8.8.8", "9.9.9.9"}
-	channels := make([]<-chan scamper.ReaderResult, len(targets))
+	channels := make([]<-chan scamper_client.ReaderResult, len(targets))
 
 	for i, target := range targets {
 		ch, err := client.Send("trace -P icmp-paris " + target)

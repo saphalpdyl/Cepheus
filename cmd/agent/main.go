@@ -44,7 +44,7 @@ func main() {
 			slog.ErrorContext(ctx, "cannot get Executable directory")
 		}
 
-		scamperBinPath = path.Join(dirPath, "scamper")
+		scamperBinPath = path.Join(dirPath, "scamper-client")
 	}
 
 	data, err := os.ReadFile(cfgPath)

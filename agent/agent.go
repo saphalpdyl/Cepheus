@@ -3,8 +3,8 @@ package agent
 import (
 	"cepheus/agent/log"
 	"cepheus/api"
-	"cepheus/scamper"
-	goscamper "cepheus/scamper"
+	"cepheus/scamper-client"
+	goscamper "cepheus/scamper-client"
 	"cepheus/stamp"
 	"cepheus/telemetry"
 	"context"
@@ -135,9 +135,9 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	defer dispatcher.Stop()
 
 	scamper, err := goscamper.NewClient(
-		scamper.ScamperClientConfig{
+		scamper_client.ScamperClientConfig{
 			BinPath:    a.scamperBinPath,
-			SocketPath: "/tmp/scamper.sock",
+			SocketPath: "/tmp/scamper-client.sock",
 			PPS:        uint32(a.agentConfig.ScamperPPS),
 			Format:     goscamper.ScamperFormatJSON,
 		},
@@ -147,7 +147,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		if errors.Is(err, &scamperError) {
 			a.logger.ErrorContext(ctx, err.Error())
 		} else {
-			a.logger.ErrorContext(ctx, "error initializing scamper client", log.Err(err))
+			a.logger.ErrorContext(ctx, "error initializing scamper-client client", log.Err(err))
 		}
 
 		return err
@@ -155,7 +155,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 
 	err = scamper.Start(ctx)
 	if err != nil {
-		a.logger.ErrorContext(ctx, "cannot start scamper", log.Err(err))
+		a.logger.ErrorContext(ctx, "cannot start scamper-client", log.Err(err))
 		return err
 	}
 
@@ -217,7 +217,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	<-ctx.Done()
 	err = scamper.Stop()
 	if err != nil {
-		a.logger.ErrorContext(ctx, "failed to stop scamper", log.Err(err))
+		a.logger.ErrorContext(ctx, "failed to stop scamper-client", log.Err(err))
 	}
 
 	return nil

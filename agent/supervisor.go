@@ -2,7 +2,7 @@ package agent
 
 import (
 	"cepheus/api"
-	goscamper "cepheus/scamper"
+	goscamper "cepheus/scamper-client"
 	"context"
 	"log/slog"
 	"sync"

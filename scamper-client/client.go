@@ -1,4 +1,4 @@
-package scamper
+package scamper_client
 
 import (
 	"bufio"
@@ -27,7 +27,7 @@ type ScamperClient struct {
 	mu sync.Mutex
 
 	pendingQ []chan<- ReaderResult
-	waiters  map[string]chan<- ReaderResult // scamper id -> channel mapping
+	waiters  map[string]chan<- ReaderResult // scamper-client id -> channel mapping
 
 	done chan struct{}
 }
@@ -38,7 +38,7 @@ func NewClient(cfg ScamperClientConfig) (*ScamperClient, error) {
 	}
 
 	if cfg.SocketPath == "" {
-		cfg.SocketPath = "/tmp/scamper.sock"
+		cfg.SocketPath = "/tmp/scamper-client.sock"
 	}
 
 	if cfg.BinPath == "" {
@@ -75,7 +75,7 @@ func (s *ScamperClient) Start(ctx context.Context) error {
 	)
 
 	if err := s.cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start scamper: %w", err)
+		return fmt.Errorf("failed to start scamper-client: %w", err)
 	}
 
 	// wait for socket to appear

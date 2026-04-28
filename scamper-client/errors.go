@@ -1,4 +1,4 @@
-package scamper
+package scamper_client
 
 import "fmt"
 

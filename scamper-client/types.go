@@ -1,4 +1,4 @@
-package scamper
+package scamper_client
 
 type ScamperClientConfig struct {
 	BinPath    string

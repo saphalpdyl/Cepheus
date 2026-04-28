@@ -12,9 +12,9 @@ WORKDIR /src/scamper-cvs-${SCAMPER_VERSION}
 RUN LDFLAGS="-static -Wl,--allow-multiple-definition" \
     ./configure --host=${CROSS_TRIPLE} \
     --enable-static --disable-shared \
-    --disable-scamper-tbit --disable-scamper-sting \
-    --disable-scamper-sniff --disable-scamper-dealias \
-    --disable-scamper-host --disable-scamper-http
+    --disable-scamper-client-tbit --disable-scamper-client-sting \
+    --disable-scamper-client-sniff --disable-scamper-client-dealias \
+    --disable-scamper-client-host --disable-scamper-client-http
 
 RUN make LDFLAGS="-all-static -Wl,--allow-multiple-definition"
 
