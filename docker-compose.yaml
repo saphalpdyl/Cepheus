@@ -83,6 +83,22 @@ services:
       - db
       - nats-server
 
+  cepheus-argus:
+    image: cepheus-argus:latest
+    container_name: cepheus-argus
+    build:
+      context: .
+      dockerfile: docker/cepheus-argus.Dockerfile
+    ports:
+      - 8087:8080
+    environment:
+      - OTEL_SINK=otel
+      - OTEL_ENDPOINT=otel-collector:4318
+      - DETECTION_INTERVAL_SECONDS=30
+      - CEPHEUS_DB_URL=postgres://postgres:admin@db:5432/postgres?sslmode=disable
+    depends_on:
+      - db
+
   cepheus-frontend:
     image: cepheus-frontend:latest
     container_name: cepheus-frontend
