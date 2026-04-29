@@ -1,5 +1,6 @@
-## Cepheus
-
+<img src="docs/images/logo.png" width="500">
+---
+---
 Modularized route health monitoring with software-based agents for managed network systems.
 
 ### Table of Contents
