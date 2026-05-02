@@ -41,7 +41,7 @@ func main() {
 
 	slog.InfoContext(ctx, "starting argus")
 
-	d := argus.NewDetector(
+	d := argus.NewArgusInstance(
 		serviceInstanceId,
 		config,
 		slog.Default().With(log.Domain(log.DomainDetectorLifecycle)),

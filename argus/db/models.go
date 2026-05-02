@@ -8,30 +8,60 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type StampAnomaly struct {
+type ArgusBaseline struct {
+	SerialID  string
+	Target    string
+	Port      int32
+	Metric    string
+	Detector  string
+	State     []byte
+	N         int64
+	LastSeen  pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+type ArgusEvent struct {
+	ID           pgtype.UUID
+	SerialID     string
+	Target       string
+	Port         int32
+	Metric       string
+	Status       string
+	OpenedAt     pgtype.Timestamptz
+	LastSeenAt   pgtype.Timestamptz
+	ClosedAt     pgtype.Timestamptz
+	FindingCount int32
+	PeakSeverity float64
+	Detectors    []string
+}
+
+type ArgusFinding struct {
 	ID        pgtype.UUID
 	SerialID  string
 	Target    string
 	Port      int32
 	Metric    string
+	Detector  string
 	Ts        pgtype.Timestamptz
 	Value     float64
-	Mean      float64
-	Stddev    float64
-	ZScore    float64
+	Severity  float64
+	Details   []byte
+	EventID   pgtype.UUID
 	CreatedAt pgtype.Timestamptz
 }
 
-type StampBaseline struct {
-	SerialID  string
-	Target    string
-	Port      int32
-	Metric    string
-	Mean      float64
-	Variance  float64
-	N         int64
-	LastSeen  pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+type ArgusPolicyState struct {
+	SerialID        string
+	Target          string
+	Port            int32
+	Metric          string
+	Status          string
+	Score           float64
+	ScoreUpdatedAt  pgtype.Timestamptz
+	OpenEventID     pgtype.UUID
+	PendingFindings []pgtype.UUID
+	EnteredStatusAt pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
 }
 
 type StampMeasurement struct {
@@ -44,6 +74,9 @@ type StampMeasurement struct {
 	Sent          int32
 	Received      int32
 	Loss          float64
+	RttP95Ns      int64
+	BwdP95Ns      int64
+	FwdP95Ns      int64
 }
 
 type StampProbe struct {

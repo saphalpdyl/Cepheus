@@ -11,43 +11,88 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const fetchNewLossSamples = `-- name: FetchNewLossSamples :many
-SELECT timestamp, loss
+const attachFindingToEvent = `-- name: AttachFindingToEvent :exec
+UPDATE argus_findings
+SET event_id = $1
+WHERE id = $2
+`
+
+type AttachFindingToEventParams struct {
+	EventID pgtype.UUID
+	ID      pgtype.UUID
+}
+
+func (q *Queries) AttachFindingToEvent(ctx context.Context, arg AttachFindingToEventParams) error {
+	_, err := q.db.Exec(ctx, attachFindingToEvent, arg.EventID, arg.ID)
+	return err
+}
+
+const closeEvent = `-- name: CloseEvent :exec
+UPDATE argus_events
+SET status    = 'closed',
+    closed_at = $2
+WHERE id = $1
+`
+
+type CloseEventParams struct {
+	ID       pgtype.UUID
+	ClosedAt pgtype.Timestamptz
+}
+
+func (q *Queries) CloseEvent(ctx context.Context, arg CloseEventParams) error {
+	_, err := q.db.Exec(ctx, closeEvent, arg.ID, arg.ClosedAt)
+	return err
+}
+
+const fetchStampSamples = `-- name: FetchStampSamples :many
+SELECT timestamp, loss, rtt_p95_ns, fwd_p95_ns, bwd_p95_ns
 FROM stamp_measurements
-WHERE serial_id = $1 AND target = $2 AND port = $3
-  AND timestamp > $4 AND timestamp <= $5
+WHERE serial_id = $1
+  AND target = $2
+  AND port = $3
+  AND timestamp > $4
+  AND timestamp <= $5
 ORDER BY timestamp ASC
 `
 
-type FetchNewLossSamplesParams struct {
-	SerialID    string
-	Target      string
-	Port        int32
-	Timestamp   pgtype.Timestamptz
-	Timestamp_2 pgtype.Timestamptz
+type FetchStampSamplesParams struct {
+	SerialID string
+	Target   string
+	Port     int32
+	After    pgtype.Timestamptz
+	Before   pgtype.Timestamptz
 }
 
-type FetchNewLossSamplesRow struct {
+type FetchStampSamplesRow struct {
 	Timestamp pgtype.Timestamptz
 	Loss      float64
+	RttP95Ns  int64
+	FwdP95Ns  int64
+	BwdP95Ns  int64
 }
 
-func (q *Queries) FetchNewLossSamples(ctx context.Context, arg FetchNewLossSamplesParams) ([]FetchNewLossSamplesRow, error) {
-	rows, err := q.db.Query(ctx, fetchNewLossSamples,
+func (q *Queries) FetchStampSamples(ctx context.Context, arg FetchStampSamplesParams) ([]FetchStampSamplesRow, error) {
+	rows, err := q.db.Query(ctx, fetchStampSamples,
 		arg.SerialID,
 		arg.Target,
 		arg.Port,
-		arg.Timestamp,
-		arg.Timestamp_2,
+		arg.After,
+		arg.Before,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []FetchNewLossSamplesRow
+	var items []FetchStampSamplesRow
 	for rows.Next() {
-		var i FetchNewLossSamplesRow
-		if err := rows.Scan(&i.Timestamp, &i.Loss); err != nil {
+		var i FetchStampSamplesRow
+		if err := rows.Scan(
+			&i.Timestamp,
+			&i.Loss,
+			&i.RttP95Ns,
+			&i.FwdP95Ns,
+			&i.BwdP95Ns,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -59,9 +104,13 @@ func (q *Queries) FetchNewLossSamples(ctx context.Context, arg FetchNewLossSampl
 }
 
 const getBaseline = `-- name: GetBaseline :one
-SELECT mean, variance, n, last_seen
-FROM stamp_baselines
-WHERE serial_id = $1 AND target = $2 AND port = $3 AND metric = $4
+SELECT state, n, last_seen
+FROM argus_baselines
+WHERE serial_id = $1
+  AND target = $2
+  AND port = $3
+  AND metric = $4
+  AND detector = $5
 `
 
 type GetBaselineParams struct {
@@ -69,11 +118,11 @@ type GetBaselineParams struct {
 	Target   string
 	Port     int32
 	Metric   string
+	Detector string
 }
 
 type GetBaselineRow struct {
-	Mean     float64
-	Variance float64
+	State    []byte
 	N        int64
 	LastSeen pgtype.Timestamptz
 }
@@ -84,46 +133,87 @@ func (q *Queries) GetBaseline(ctx context.Context, arg GetBaselineParams) (GetBa
 		arg.Target,
 		arg.Port,
 		arg.Metric,
+		arg.Detector,
 	)
 	var i GetBaselineRow
-	err := row.Scan(
-		&i.Mean,
-		&i.Variance,
-		&i.N,
-		&i.LastSeen,
-	)
+	err := row.Scan(&i.State, &i.N, &i.LastSeen)
 	return i, err
 }
 
-const insertAnomaly = `-- name: InsertAnomaly :exec
-INSERT INTO stamp_anomalies
-(serial_id, target, port, metric, ts, value, mean, stddev, z_score)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+const getPolicyState = `-- name: GetPolicyState :one
+SELECT status, score, score_updated_at, open_event_id, pending_findings, entered_status_at
+FROM argus_policy_state
+WHERE serial_id = $1
+  AND target = $2
+  AND port = $3
+  AND metric = $4
 `
 
-type InsertAnomalyParams struct {
+type GetPolicyStateParams struct {
 	SerialID string
 	Target   string
 	Port     int32
 	Metric   string
-	Ts       pgtype.Timestamptz
-	Value    float64
-	Mean     float64
-	Stddev   float64
-	ZScore   float64
 }
 
-func (q *Queries) InsertAnomaly(ctx context.Context, arg InsertAnomalyParams) error {
-	_, err := q.db.Exec(ctx, insertAnomaly,
+type GetPolicyStateRow struct {
+	Status          string
+	Score           float64
+	ScoreUpdatedAt  pgtype.Timestamptz
+	OpenEventID     pgtype.UUID
+	PendingFindings []pgtype.UUID
+	EnteredStatusAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetPolicyState(ctx context.Context, arg GetPolicyStateParams) (GetPolicyStateRow, error) {
+	row := q.db.QueryRow(ctx, getPolicyState,
 		arg.SerialID,
 		arg.Target,
 		arg.Port,
 		arg.Metric,
+	)
+	var i GetPolicyStateRow
+	err := row.Scan(
+		&i.Status,
+		&i.Score,
+		&i.ScoreUpdatedAt,
+		&i.OpenEventID,
+		&i.PendingFindings,
+		&i.EnteredStatusAt,
+	)
+	return i, err
+}
+
+const insertFinding = `-- name: InsertFinding :exec
+INSERT INTO argus_findings
+(serial_id, target, port, metric, detector, ts, value, severity, details)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (serial_id, target, port, metric, detector, ts) DO NOTHING
+`
+
+type InsertFindingParams struct {
+	SerialID string
+	Target   string
+	Port     int32
+	Metric   string
+	Detector string
+	Ts       pgtype.Timestamptz
+	Value    float64
+	Severity float64
+	Details  []byte
+}
+
+func (q *Queries) InsertFinding(ctx context.Context, arg InsertFindingParams) error {
+	_, err := q.db.Exec(ctx, insertFinding,
+		arg.SerialID,
+		arg.Target,
+		arg.Port,
+		arg.Metric,
+		arg.Detector,
 		arg.Ts,
 		arg.Value,
-		arg.Mean,
-		arg.Stddev,
-		arg.ZScore,
+		arg.Severity,
+		arg.Details,
 	)
 	return err
 }
@@ -160,16 +250,137 @@ func (q *Queries) ListActiveSeries(ctx context.Context, timestamp pgtype.Timesta
 	return items, nil
 }
 
+const listNonCleanPolicyStates = `-- name: ListNonCleanPolicyStates :many
+SELECT serial_id,
+       target,
+       port,
+       metric,
+       status,
+       score,
+       score_updated_at,
+       open_event_id,
+       pending_findings,
+       entered_status_at
+FROM argus_policy_state
+WHERE status <> 'clean'
+`
+
+type ListNonCleanPolicyStatesRow struct {
+	SerialID        string
+	Target          string
+	Port            int32
+	Metric          string
+	Status          string
+	Score           float64
+	ScoreUpdatedAt  pgtype.Timestamptz
+	OpenEventID     pgtype.UUID
+	PendingFindings []pgtype.UUID
+	EnteredStatusAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListNonCleanPolicyStates(ctx context.Context) ([]ListNonCleanPolicyStatesRow, error) {
+	rows, err := q.db.Query(ctx, listNonCleanPolicyStates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListNonCleanPolicyStatesRow
+	for rows.Next() {
+		var i ListNonCleanPolicyStatesRow
+		if err := rows.Scan(
+			&i.SerialID,
+			&i.Target,
+			&i.Port,
+			&i.Metric,
+			&i.Status,
+			&i.Score,
+			&i.ScoreUpdatedAt,
+			&i.OpenEventID,
+			&i.PendingFindings,
+			&i.EnteredStatusAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const openEvent = `-- name: OpenEvent :one
+INSERT INTO argus_events
+(serial_id, target, port, metric, status, opened_at, last_seen_at,
+ finding_count, peak_severity, detectors)
+VALUES ($1, $2, $3, $4, 'open', $5, $5, $6, $7, $8)
+RETURNING id
+`
+
+type OpenEventParams struct {
+	SerialID     string
+	Target       string
+	Port         int32
+	Metric       string
+	OpenedAt     pgtype.Timestamptz
+	FindingCount int32
+	PeakSeverity float64
+	Detectors    []string
+}
+
+func (q *Queries) OpenEvent(ctx context.Context, arg OpenEventParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, openEvent,
+		arg.SerialID,
+		arg.Target,
+		arg.Port,
+		arg.Metric,
+		arg.OpenedAt,
+		arg.FindingCount,
+		arg.PeakSeverity,
+		arg.Detectors,
+	)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const updateEventOnFinding = `-- name: UpdateEventOnFinding :exec
+UPDATE argus_events
+SET last_seen_at  = $2,
+    finding_count = finding_count + 1,
+    peak_severity = GREATEST(peak_severity, $3),
+    detectors     = CASE
+                        WHEN $4::TEXT = ANY (detectors) THEN detectors
+                        ELSE array_append(detectors, $4::TEXT)
+        END
+WHERE id = $1
+`
+
+type UpdateEventOnFindingParams struct {
+	ID           pgtype.UUID
+	LastSeenAt   pgtype.Timestamptz
+	PeakSeverity float64
+	Column4      string
+}
+
+func (q *Queries) UpdateEventOnFinding(ctx context.Context, arg UpdateEventOnFindingParams) error {
+	_, err := q.db.Exec(ctx, updateEventOnFinding,
+		arg.ID,
+		arg.LastSeenAt,
+		arg.PeakSeverity,
+		arg.Column4,
+	)
+	return err
+}
+
 const upsertBaseline = `-- name: UpsertBaseline :exec
-INSERT INTO stamp_baselines
-(serial_id, target, port, metric, mean, variance, n, last_seen, updated_at)
+INSERT INTO argus_baselines
+(serial_id, target, port, metric, detector, state, n, last_seen, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
-ON CONFLICT (serial_id, target, port, metric) DO UPDATE SET
-                                                            mean       = EXCLUDED.mean,
-                                                            variance   = EXCLUDED.variance,
-                                                            n          = EXCLUDED.n,
-                                                            last_seen  = EXCLUDED.last_seen,
-                                                            updated_at = now()
+ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET state      = EXCLUDED.state,
+                                                                      n          = EXCLUDED.n,
+                                                                      last_seen  = EXCLUDED.last_seen,
+                                                                      updated_at = now()
 `
 
 type UpsertBaselineParams struct {
@@ -177,8 +388,8 @@ type UpsertBaselineParams struct {
 	Target   string
 	Port     int32
 	Metric   string
-	Mean     float64
-	Variance float64
+	Detector string
+	State    []byte
 	N        int64
 	LastSeen pgtype.Timestamptz
 }
@@ -189,10 +400,53 @@ func (q *Queries) UpsertBaseline(ctx context.Context, arg UpsertBaselineParams) 
 		arg.Target,
 		arg.Port,
 		arg.Metric,
-		arg.Mean,
-		arg.Variance,
+		arg.Detector,
+		arg.State,
 		arg.N,
 		arg.LastSeen,
+	)
+	return err
+}
+
+const upsertPolicyState = `-- name: UpsertPolicyState :exec
+INSERT INTO argus_policy_state
+(serial_id, target, port, metric, status, score, score_updated_at,
+ open_event_id, pending_findings, entered_status_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+ON CONFLICT (serial_id, target, port, metric) DO UPDATE SET status            = EXCLUDED.status,
+                                                            score             = EXCLUDED.score,
+                                                            score_updated_at  = EXCLUDED.score_updated_at,
+                                                            open_event_id     = EXCLUDED.open_event_id,
+                                                            pending_findings  = EXCLUDED.pending_findings,
+                                                            entered_status_at = EXCLUDED.entered_status_at,
+                                                            updated_at        = now()
+`
+
+type UpsertPolicyStateParams struct {
+	SerialID        string
+	Target          string
+	Port            int32
+	Metric          string
+	Status          string
+	Score           float64
+	ScoreUpdatedAt  pgtype.Timestamptz
+	OpenEventID     pgtype.UUID
+	PendingFindings []pgtype.UUID
+	EnteredStatusAt pgtype.Timestamptz
+}
+
+func (q *Queries) UpsertPolicyState(ctx context.Context, arg UpsertPolicyStateParams) error {
+	_, err := q.db.Exec(ctx, upsertPolicyState,
+		arg.SerialID,
+		arg.Target,
+		arg.Port,
+		arg.Metric,
+		arg.Status,
+		arg.Score,
+		arg.ScoreUpdatedAt,
+		arg.OpenEventID,
+		arg.PendingFindings,
+		arg.EnteredStatusAt,
 	)
 	return err
 }

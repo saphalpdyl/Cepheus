@@ -12,7 +12,7 @@ build:
 	docker build -t cepheus-frontend:latest -f docker/cepheus-frontend.Dockerfile ./frontend
 
 dev: build
-	docker compose up --build cepheus-server cepheus-stamp-processor cepheus-trace-processor cepheus-detector
+	docker compose up --build cepheus-server cepheus-stamp-processor cepheus-trace-processor cepheus-argus
 
 fe:
 	docker compose up --build cepheus-frontend

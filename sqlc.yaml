@@ -29,7 +29,7 @@ sql:
     queries: "db/queries/argus/"
     schema:
       - "db/init/02-stamp.sql"
-      - "db/init/07-stamp_baselines.sql"
+      - "db/init/07-argus.sql"
     gen:
       go:
         package: "argus_db"

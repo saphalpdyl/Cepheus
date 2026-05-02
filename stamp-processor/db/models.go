@@ -18,6 +18,9 @@ type StampMeasurement struct {
 	Sent          int32
 	Received      int32
 	Loss          float64
+	RttP95Ns      int64
+	BwdP95Ns      int64
+	FwdP95Ns      int64
 }
 
 type StampProbe struct {

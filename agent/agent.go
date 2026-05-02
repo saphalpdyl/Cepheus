@@ -137,7 +137,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	scamper, err := goscamper.NewClient(
 		scamper_client.ScamperClientConfig{
 			BinPath:    a.scamperBinPath,
-			SocketPath: "/tmp/scamper-client.sock",
+			SocketPath: "/tmp/scamper.sock",
 			PPS:        uint32(a.agentConfig.ScamperPPS),
 			Format:     goscamper.ScamperFormatJSON,
 		},

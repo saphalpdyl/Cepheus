@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -26,6 +27,13 @@ type StampProcessor struct {
 	logger *slog.Logger
 	pool   *pgxpool.Pool
 	query  *stampprocessor_db.Queries
+}
+
+type LatencyStats struct {
+	Mean   time.Duration
+	P50    time.Duration
+	P95    time.Duration
+	StdDev time.Duration
 }
 
 func NewStampProcessor(instanceId string, config StampProcessorConfig, logger *slog.Logger) StampProcessor {
@@ -194,6 +202,24 @@ func (s *StampProcessor) insertStampData(
 	}
 	defer tx.Rollback(ctx)
 
+	rtts := make([]time.Duration, 0, len(stampData.Probes))
+	fwds := make([]time.Duration, 0, len(stampData.Probes))
+	bwds := make([]time.Duration, 0, len(stampData.Probes))
+
+	for _, probe := range stampData.Probes {
+		if probe.IsLost {
+			continue
+		}
+
+		rtts = append(rtts, probe.Rtt)
+		fwds = append(fwds, probe.ForwardDelay)
+		bwds = append(bwds, probe.BackwardDelay)
+	}
+
+	rttStats := computeStats(rtts)
+	fwdStats := computeStats(fwds)
+	bwdStats := computeStats(bwds)
+
 	// Insert stamp measurement first
 	measurement, err := s.query.WithTx(tx).InsertStampMeasurement(ctx, stampprocessor_db.InsertStampMeasurementParams{
 		Timestamp:     pgtype.Timestamptz{Time: stampData.Timestamp, Valid: true},
@@ -204,6 +230,9 @@ func (s *StampProcessor) insertStampData(
 		Sent:          int32(stampData.Sent),
 		Received:      int32(stampData.Received),
 		Loss:          stampData.Loss,
+		RttP95Ns:      int64(rttStats.P95),
+		FwdP95Ns:      int64(fwdStats.P95),
+		BwdP95Ns:      int64(bwdStats.P95),
 	})
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to insert stamp measurement", log.Err(err))
@@ -253,4 +282,43 @@ func (s *StampProcessor) insertStampData(
 	}
 
 	return nil
+}
+
+func computeStats(values []time.Duration) LatencyStats {
+	if len(values) == 0 {
+		return LatencyStats{}
+	}
+
+	sort.Slice(values, func(i, j int) bool {
+		return values[i] < values[j]
+	})
+
+	var sum int64
+	for _, v := range values {
+		sum += int64(v)
+	}
+	mean := time.Duration(sum / int64(len(values)))
+
+	return LatencyStats{
+		Mean: mean,
+		P50:  percentile(values, 0.50),
+		P95:  percentile(values, 0.95),
+	}
+}
+
+func percentile(sorted []time.Duration, p float64) time.Duration {
+	if len(sorted) == 0 {
+		return 0
+	}
+	if len(sorted) == 1 {
+		return sorted[0]
+	}
+	rank := p * float64(len(sorted)-1)
+	lo := int(rank)
+	hi := lo + 1
+	if hi >= len(sorted) {
+		return sorted[len(sorted)-1]
+	}
+	frac := rank - float64(lo)
+	return time.Duration(float64(sorted[lo])*(1-frac) + float64(sorted[hi])*frac)
 }

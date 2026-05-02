@@ -1,6 +1,6 @@
 -- name: InsertStampMeasurement :one
-INSERT INTO stamp_measurements (timestamp, serial_id, agent_config_id, target, port, sent, received, loss)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO stamp_measurements (timestamp, serial_id, agent_config_id, target, port, sent, received, loss, rtt_p95_ns, bwd_p95_ns, fwd_p95_ns)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING id;
 
 -- name: InsertStampProbes :copyfrom

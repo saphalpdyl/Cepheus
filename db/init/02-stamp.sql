@@ -4,21 +4,23 @@ CREATE TABLE IF NOT EXISTS stamp_measurements
 (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     timestamp       TIMESTAMPTZ NOT NULL,
-    serial_id       TEXT       NOT NULL,
-    agent_config_id UUID       REFERENCES agent_config (id) ON DELETE SET NULL,
-    target          TEXT       NOT NULL,
-    port            INTEGER    NOT NULL,
-    sent            INTEGER    NOT NULL,
-    received        INTEGER    NOT NULL,
-    loss            FLOAT      NOT NULL
-
+    serial_id       TEXT        NOT NULL,
+    agent_config_id UUID        REFERENCES agent_config (id) ON DELETE SET NULL,
+    target          TEXT        NOT NULL,
+    port            INTEGER     NOT NULL,
+    sent            INTEGER     NOT NULL,
+    received        INTEGER     NOT NULL,
+    loss            FLOAT       NOT NULL,
+    rtt_p95_ns      BIGINT       NOT NULL,
+    bwd_p95_ns      BIGINT       NOT NULL,
+    fwd_p95_ns      BIGINT       NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS stamp_probes
 (
-    measurement_id UUID REFERENCES stamp_measurements(id) ON DELETE CASCADE,
+    measurement_id UUID REFERENCES stamp_measurements (id) ON DELETE CASCADE,
     tx             TIMESTAMPTZ NOT NULL,
-    is_lost        BOOLEAN    NOT NULL,
+    is_lost        BOOLEAN     NOT NULL,
     rx             TIMESTAMPTZ,
     rtt            BIGINT,
     forward_delay  BIGINT,

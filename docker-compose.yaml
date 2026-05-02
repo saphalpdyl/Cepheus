@@ -94,7 +94,7 @@ services:
     environment:
       - OTEL_SINK=otel
       - OTEL_ENDPOINT=otel-collector:4318
-      - DETECTION_INTERVAL_SECONDS=30
+      - DETECTION_INTERVAL_SECONDS=10
       - CEPHEUS_DB_URL=postgres://postgres:admin@db:5432/postgres?sslmode=disable
     depends_on:
       - db
