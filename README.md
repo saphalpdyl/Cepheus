@@ -10,6 +10,7 @@ Modularized route health monitoring with software-based agents for managed netwo
 - [Architecture](#architecture)
 - [Contributions](#contributions)
 - [Setup development environment](/docs/setup-dev.md)
+- [Screenshots](#screenshots--prototype-)
 
 ---
 ### Architecture
@@ -25,3 +26,7 @@ Below is the draft architecture diagram for cepheus platform as a whole.
 Although the development environment is developer-friendly and reproducible, the project lacks proper documentations for its architecture and design choices to be considered welcoming to contributors.
 
 Once that is formed, the project will welcome contributors.
+
+### Screenshots ( prototype )
+![First screenshot](/docs/images/screenshots/prototype/scrn1.png)
+![Second screenshot](/docs/images/screenshots/prototype/scrn2.png)
