@@ -1,0 +1,7 @@
+{
+  "name": "cepheus-assets",
+  "private": true,
+  "dependencies": {
+    "apexcharts": "^3.54.0"
+  }
+}

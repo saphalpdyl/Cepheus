@@ -18,5 +18,6 @@ defmodule CepheusWeb.Router do
     pipe_through :browser
 
     live "/", DashboardLive, :index
+    live "/devices/:serial_id", DashboardLive, :show
   end
 end
