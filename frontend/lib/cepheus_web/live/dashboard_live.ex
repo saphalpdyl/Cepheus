@@ -15,6 +15,9 @@ defmodule CepheusWeb.DashboardLive do
       |> assign(:window, @default_window)
       |> assign(:windows, Dashboard.windows())
       |> assign(:page_title, "Cepheus")
+      |> assign(:open_event_counts, %{})
+      |> assign(:events, [])
+      |> assign(:findings, [])
 
     {:ok, socket}
   end
@@ -86,9 +89,12 @@ defmodule CepheusWeb.DashboardLive do
         {d.serial_id, Dashboard.summary_by_target(d.serial_id, window)}
       end)
 
+    open_event_counts = Dashboard.open_event_counts_by_device()
+
     socket
     |> assign(:devices, devices)
     |> assign(:summary_by_serial, summaries)
+    |> assign(:open_event_counts, open_event_counts)
     |> assign(:last_loaded_at, DateTime.utc_now())
   end
 
@@ -97,11 +103,15 @@ defmodule CepheusWeb.DashboardLive do
     tasks = Dashboard.list_tasks_for_config(device.agent_config_id)
     summary = Dashboard.summary_by_target(device.serial_id, window)
     series = Dashboard.measurement_timeseries(device.serial_id, window)
+    events = Dashboard.events_for_device(device.serial_id, window)
+    findings = Dashboard.recent_findings_for_device(device.serial_id, window)
 
     socket
     |> assign(:tasks, tasks)
     |> assign(:summary, summary)
     |> assign(:kpis, compute_kpis(summary))
+    |> assign(:events, events)
+    |> assign(:findings, findings)
     |> assign(:last_loaded_at, DateTime.utc_now())
     |> push_event("rtt-chart:update", %{series: series})
   end

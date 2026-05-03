@@ -73,7 +73,7 @@ func (d *Argus) Start(ctx context.Context) error {
 			BaseContribution: 1,
 			MagnitudeAlpha:   1.2,
 		},
-		LeakyBucketSweepInterval: 30,
+		LeakyBucketSweepInterval: 30 * time.Second,
 		QuietPeriod:              120 * time.Second,
 		ConfirmWindow:            60 * time.Second,
 		TransactionGenerator:     generateDbTransaction,

@@ -150,6 +150,103 @@
 
 <section class="card bg-base-100 border border-base-300">
   <div class="card-body gap-3">
+    <div class="flex items-center justify-between">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/70">
+        Detection events
+      </h2>
+      <span class="text-xs text-base-content/60">
+        {Enum.count(@events, &(&1.status == "open"))} open · {length(@events)} in window
+      </span>
+    </div>
+    <p :if={@events == []} class="text-sm text-base-content/60">No events in window.</p>
+    <div :if={@events != []} class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>status</th>
+            <th>target</th>
+            <th>metric</th>
+            <th>detectors</th>
+            <th class="text-right">peak severity</th>
+            <th class="text-right">findings</th>
+            <th>opened</th>
+            <th>last seen</th>
+            <th>closed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for={e <- @events}>
+            <td>
+              <span class={["badge badge-sm", event_status_badge_class(e.display_status)]}>
+                {e.display_status}
+              </span>
+            </td>
+            <td class="font-mono">{e.target}<span class="text-base-content/50">:{e.port}</span></td>
+            <td><span class="badge badge-sm badge-ghost font-mono">{e.metric}</span></td>
+            <td class="font-mono text-xs text-base-content/70">{Enum.join(e.detectors, ", ")}</td>
+            <td class="text-right">
+              <span class={["badge badge-sm tabular-nums", severity_badge_class(e.peak_severity)]}>
+                {fmt_severity(e.peak_severity)}
+              </span>
+            </td>
+            <td class="text-right tabular-nums">{e.finding_count}</td>
+            <td class="text-xs">{fmt_dt(e.opened_at)}</td>
+            <td class="text-xs">{fmt_dt(e.last_seen_at)}</td>
+            <td class="text-xs">{fmt_dt(e.closed_at)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card bg-base-100 border border-base-300">
+  <div class="card-body gap-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/70">
+      Recent findings (last {@window})
+    </h2>
+    <p :if={@findings == []} class="text-sm text-base-content/60">No findings in window.</p>
+    <div :if={@findings != []} class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>ts</th>
+            <th>target</th>
+            <th>metric</th>
+            <th>detector</th>
+            <th class="text-right">value</th>
+            <th class="text-right">severity</th>
+            <th>details</th>
+            <th>event</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for={f <- @findings}>
+            <td class="text-xs whitespace-nowrap">{fmt_dt(f.ts)}</td>
+            <td class="font-mono">{f.target}<span class="text-base-content/50">:{f.port}</span></td>
+            <td><span class="badge badge-sm badge-ghost font-mono">{f.metric}</span></td>
+            <td class="font-mono text-xs">{f.detector}</td>
+            <td class="text-right tabular-nums">{f.value}</td>
+            <td class="text-right">
+              <span class={["badge badge-sm tabular-nums", severity_badge_class(f.severity)]}>
+                {fmt_severity(f.severity)}
+              </span>
+            </td>
+            <td class="font-mono text-xs text-base-content/70" title={f.details}>
+              {trunc_details(f.details)}
+            </td>
+            <td class="font-mono text-xs text-base-content/60">
+              {if f.event_id, do: short_uuid(f.event_id), else: "—"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card bg-base-100 border border-base-300">
+  <div class="card-body gap-3">
     <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/70">
       Probe tasks
     </h2>

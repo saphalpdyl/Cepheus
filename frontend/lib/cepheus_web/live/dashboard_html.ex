@@ -91,4 +91,31 @@ defmodule CepheusWeb.DashboardHTML do
       rows -> rows |> Enum.map(& &1.loss) |> Enum.max() |> fmt_loss()
     end
   end
+
+  def fmt_severity(nil), do: "—"
+
+  def fmt_severity(s) when is_float(s),
+    do: :io_lib.format("~.2f", [s]) |> IO.iodata_to_binary()
+
+  def fmt_severity(other), do: to_string(other)
+
+  @doc """
+  Maps an argus severity (0.0–1.0+) to a daisyUI badge variant.
+  """
+  def severity_badge_class(s) when is_float(s) and s >= 0.75, do: "badge-error"
+  def severity_badge_class(s) when is_float(s) and s >= 0.5, do: "badge-warning"
+  def severity_badge_class(s) when is_float(s) and s >= 0.25, do: "badge-info"
+  def severity_badge_class(_), do: "badge-ghost"
+
+  def event_status_badge_class("OPEN"), do: "badge-error"
+  def event_status_badge_class("RECOVERING"), do: "badge-warning"
+  def event_status_badge_class("RESOLVED"), do: "badge-success"
+  def event_status_badge_class("open"), do: "badge-error"
+  def event_status_badge_class("closed"), do: "badge-success"
+  def event_status_badge_class(_), do: "badge-ghost"
+
+  @doc "Truncate JSONB-as-text for inline display."
+  def trunc_details(nil), do: ""
+  def trunc_details(s) when is_binary(s) and byte_size(s) > 80, do: binary_part(s, 0, 80) <> "…"
+  def trunc_details(s) when is_binary(s), do: s
 end

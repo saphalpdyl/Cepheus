@@ -183,7 +183,7 @@ func (p *PolicyEngine) Sweep(ctx context.Context) error {
 			if now.Sub(state.StatusUpdatedAt) > p.confirmWindow {
 				// If it has been longer than the allowed window before reverting back to clean
 				state.Status = PolicyStateStatusClean
-				state.PendingFindings = []*PendingFinding{}
+				state.PendingFindings = make([]*PendingFinding, 0)
 				state.StatusUpdatedAt = now
 			}
 		case PolicyStateStatusFiring:
@@ -205,7 +205,7 @@ func (p *PolicyEngine) Sweep(ctx context.Context) error {
 
 				state.Status = PolicyStateStatusClean
 				state.OpenEventId = nil
-				state.PendingFindings = []*PendingFinding{}
+				state.PendingFindings = make([]*PendingFinding, 0)
 				state.StatusUpdatedAt = now
 			}
 		}
@@ -284,7 +284,7 @@ func (p *PolicyEngine) ApplyFinding(ctx context.Context, seriesKey types.SeriesK
 					ScoreUpdatedAt: time.Time{},
 				},
 				OpenEventId:     nil,
-				PendingFindings: []*PendingFinding{},
+				PendingFindings: make([]*PendingFinding, 0),
 			}
 
 			p.states[seriesKey] = state
@@ -407,7 +407,7 @@ func (p *PolicyEngine) ApplyFinding(ctx context.Context, seriesKey types.SeriesK
 
 			state.Status = PolicyStateStatusFiring
 			state.OpenEventId = &uuidValue
-			state.PendingFindings = []*PendingFinding{}
+			state.PendingFindings = make([]*PendingFinding, 0)
 			state.StatusUpdatedAt = finding.TS
 		}
 	case PolicyStateStatusFiring:
@@ -458,7 +458,7 @@ func (p *PolicyEngine) attachFindingToEvent(ctx context.Context, eventId uuid.UU
 }
 
 func (p *PolicyEngine) savePolicyState(ctx context.Context, seriesKey types.SeriesKey, state *PolicyState) error {
-	var pendingFindingUUIDs []pgtype.UUID
+	pendingFindingUUIDs := make([]pgtype.UUID, 0)
 	for _, finding := range state.PendingFindings {
 		parsedId, err := uuid.Parse(finding.Id)
 		if err != nil {

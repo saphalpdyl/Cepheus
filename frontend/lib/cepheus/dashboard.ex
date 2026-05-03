@@ -203,4 +203,163 @@ defmodule Cepheus.Dashboard do
     end)
     |> Enum.sort_by(& &1.name)
   end
+
+  @doc """
+  Recent argus events for a device. Returns currently-open events plus any
+  events opened within the selected window. Sorted open-first, then newest.
+  """
+  def events_for_device(serial_id, window) when is_binary(serial_id) and is_binary(window) do
+    interval = window_interval!(window)
+
+    # Join with argus_policy_state to surface the live policy status (clean /
+    # watching / firing / recovering). The PK on policy_state includes detector,
+    # so a (serial_id, target, port, metric) key may have multiple rows — we
+    # take the worst (firing > recovering > watching > clean) so a single
+    # detector still firing dominates the displayed status.
+    sql = """
+    WITH worst_policy AS (
+      SELECT serial_id, target, port, metric,
+             CASE
+               WHEN bool_or(status = 'firing')     THEN 'firing'
+               WHEN bool_or(status = 'recovering') THEN 'recovering'
+               WHEN bool_or(status = 'watching')   THEN 'watching'
+               ELSE 'clean'
+             END AS policy_status
+      FROM argus_policy_state
+      GROUP BY serial_id, target, port, metric
+    )
+    SELECT e.id::text,
+           e.target,
+           e.port,
+           e.metric,
+           e.status,
+           COALESCE(p.policy_status, 'unknown') AS policy_status,
+           e.opened_at,
+           e.last_seen_at,
+           e.closed_at,
+           e.finding_count,
+           e.peak_severity,
+           e.detectors
+    FROM argus_events e
+    LEFT JOIN worst_policy p
+      ON p.serial_id = e.serial_id
+     AND p.target    = e.target
+     AND p.port      = e.port
+     AND p.metric    = e.metric
+    WHERE e.serial_id = $1
+      AND (e.status = 'open' OR e.opened_at > NOW() - INTERVAL '#{interval}')
+    ORDER BY
+      CASE e.status WHEN 'open' THEN 0 ELSE 1 END,
+      e.opened_at DESC
+    LIMIT 50
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [serial_id])
+
+    Enum.map(rows, fn [
+                        id,
+                        target,
+                        port,
+                        metric,
+                        status,
+                        policy_status,
+                        opened_at,
+                        last_seen_at,
+                        closed_at,
+                        finding_count,
+                        peak_severity,
+                        detectors
+                      ] ->
+      %{
+        id: id,
+        target: target,
+        port: port,
+        metric: metric,
+        status: status,
+        policy_status: policy_status,
+        display_status: derive_display_status(status, policy_status),
+        opened_at: opened_at,
+        last_seen_at: last_seen_at,
+        closed_at: closed_at,
+        finding_count: finding_count,
+        peak_severity: peak_severity,
+        detectors: detectors || []
+      }
+    end)
+  end
+
+  defp derive_display_status("closed", _), do: "RESOLVED"
+  defp derive_display_status("open", "recovering"), do: "RECOVERING"
+  defp derive_display_status("open", _), do: "OPEN"
+  defp derive_display_status(other, _), do: String.upcase(to_string(other))
+
+  @doc """
+  Most recent findings for a device, across all events.
+  """
+  def recent_findings_for_device(serial_id, window, limit \\ 50)
+      when is_binary(serial_id) and is_binary(window) and is_integer(limit) do
+    interval = window_interval!(window)
+
+    sql = """
+    SELECT id::text,
+           target,
+           port,
+           metric,
+           detector,
+           ts,
+           value,
+           severity,
+           details::text,
+           event_id::text
+    FROM argus_findings
+    WHERE serial_id = $1
+      AND ts > NOW() - INTERVAL '#{interval}'
+    ORDER BY ts DESC
+    LIMIT #{limit}
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [serial_id])
+
+    Enum.map(rows, fn [
+                        id,
+                        target,
+                        port,
+                        metric,
+                        detector,
+                        ts,
+                        value,
+                        severity,
+                        details,
+                        event_id
+                      ] ->
+      %{
+        id: id,
+        target: target,
+        port: port,
+        metric: metric,
+        detector: detector,
+        ts: ts,
+        value: value,
+        severity: severity,
+        details: details,
+        event_id: event_id
+      }
+    end)
+  end
+
+  @doc """
+  Map of serial_id → count of currently-open events. Used by the index page
+  to badge devices that have active alerts.
+  """
+  def open_event_counts_by_device do
+    sql = """
+    SELECT serial_id, COUNT(*)::int
+    FROM argus_events
+    WHERE status = 'open'
+    GROUP BY serial_id
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [])
+    Map.new(rows, fn [serial_id, count] -> {serial_id, count} end)
+  end
 end

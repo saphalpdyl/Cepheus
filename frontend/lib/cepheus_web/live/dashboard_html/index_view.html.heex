@@ -35,15 +35,21 @@
         </div>
         <% summary = Map.get(@summary_by_serial, d.serial_id, []) %>
         <% online = device_online?(d, summary) %>
-        <span class={[
-          "badge badge-sm",
-          if(online, do: "badge-success", else: "badge-error")
-        ]}>
+        <% open_events = Map.get(@open_event_counts, d.serial_id, 0) %>
+        <div class="flex items-center gap-1.5">
+          <span :if={open_events > 0} class="badge badge-sm badge-error">
+            {open_events} alert{if open_events == 1, do: "", else: "s"}
+          </span>
           <span class={[
-            "size-1.5 rounded-full",
-            if(online, do: "bg-success-content", else: "bg-error-content")
-          ]} /> {if online, do: "online", else: "stale"}
-        </span>
+            "badge badge-sm",
+            if(online, do: "badge-success", else: "badge-error")
+          ]}>
+            <span class={[
+              "size-1.5 rounded-full",
+              if(online, do: "bg-success-content", else: "bg-error-content")
+            ]} /> {if online, do: "online", else: "stale"}
+          </span>
+        </div>
       </div>
 
       <div class="grid grid-cols-3 gap-2 text-center">
