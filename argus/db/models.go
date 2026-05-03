@@ -55,6 +55,7 @@ type ArgusPolicyState struct {
 	Target          string
 	Port            int32
 	Metric          string
+	Detector        string
 	Status          string
 	Score           float64
 	ScoreUpdatedAt  pgtype.Timestamptz

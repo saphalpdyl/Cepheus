@@ -141,12 +141,15 @@ func (q *Queries) GetBaseline(ctx context.Context, arg GetBaselineParams) (GetBa
 }
 
 const getPolicyState = `-- name: GetPolicyState :one
-SELECT status, score, score_updated_at, open_event_id, pending_findings, entered_status_at
+SELECT serial_id, target, port, metric, detector,
+       status, score, score_updated_at,
+       open_event_id, pending_findings, entered_status_at
 FROM argus_policy_state
 WHERE serial_id = $1
   AND target = $2
   AND port = $3
   AND metric = $4
+  AND detector = $5
 `
 
 type GetPolicyStateParams struct {
@@ -154,9 +157,15 @@ type GetPolicyStateParams struct {
 	Target   string
 	Port     int32
 	Metric   string
+	Detector string
 }
 
 type GetPolicyStateRow struct {
+	SerialID        string
+	Target          string
+	Port            int32
+	Metric          string
+	Detector        string
 	Status          string
 	Score           float64
 	ScoreUpdatedAt  pgtype.Timestamptz
@@ -171,9 +180,15 @@ func (q *Queries) GetPolicyState(ctx context.Context, arg GetPolicyStateParams) 
 		arg.Target,
 		arg.Port,
 		arg.Metric,
+		arg.Detector,
 	)
 	var i GetPolicyStateRow
 	err := row.Scan(
+		&i.SerialID,
+		&i.Target,
+		&i.Port,
+		&i.Metric,
+		&i.Detector,
 		&i.Status,
 		&i.Score,
 		&i.ScoreUpdatedAt,
@@ -184,11 +199,12 @@ func (q *Queries) GetPolicyState(ctx context.Context, arg GetPolicyStateParams) 
 	return i, err
 }
 
-const insertFinding = `-- name: InsertFinding :exec
+const insertFinding = `-- name: InsertFinding :one
 INSERT INTO argus_findings
-(serial_id, target, port, metric, detector, ts, value, severity, details)
+    (serial_id, target, port, metric, detector, ts, value, severity, details)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (serial_id, target, port, metric, detector, ts) DO NOTHING
+RETURNING id
 `
 
 type InsertFindingParams struct {
@@ -203,8 +219,8 @@ type InsertFindingParams struct {
 	Details  []byte
 }
 
-func (q *Queries) InsertFinding(ctx context.Context, arg InsertFindingParams) error {
-	_, err := q.db.Exec(ctx, insertFinding,
+func (q *Queries) InsertFinding(ctx context.Context, arg InsertFindingParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, insertFinding,
 		arg.SerialID,
 		arg.Target,
 		arg.Port,
@@ -215,7 +231,9 @@ func (q *Queries) InsertFinding(ctx context.Context, arg InsertFindingParams) er
 		arg.Severity,
 		arg.Details,
 	)
-	return err
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const listActiveSeries = `-- name: ListActiveSeries :many
@@ -251,16 +269,9 @@ func (q *Queries) ListActiveSeries(ctx context.Context, timestamp pgtype.Timesta
 }
 
 const listNonCleanPolicyStates = `-- name: ListNonCleanPolicyStates :many
-SELECT serial_id,
-       target,
-       port,
-       metric,
-       status,
-       score,
-       score_updated_at,
-       open_event_id,
-       pending_findings,
-       entered_status_at
+SELECT serial_id, target, port, metric, detector,
+       status, score, score_updated_at,
+       open_event_id, pending_findings, entered_status_at
 FROM argus_policy_state
 WHERE status <> 'clean'
 `
@@ -270,6 +281,7 @@ type ListNonCleanPolicyStatesRow struct {
 	Target          string
 	Port            int32
 	Metric          string
+	Detector        string
 	Status          string
 	Score           float64
 	ScoreUpdatedAt  pgtype.Timestamptz
@@ -292,6 +304,7 @@ func (q *Queries) ListNonCleanPolicyStates(ctx context.Context) ([]ListNonCleanP
 			&i.Target,
 			&i.Port,
 			&i.Metric,
+			&i.Detector,
 			&i.Status,
 			&i.Score,
 			&i.ScoreUpdatedAt,
@@ -311,8 +324,8 @@ func (q *Queries) ListNonCleanPolicyStates(ctx context.Context) ([]ListNonCleanP
 
 const openEvent = `-- name: OpenEvent :one
 INSERT INTO argus_events
-(serial_id, target, port, metric, status, opened_at, last_seen_at,
- finding_count, peak_severity, detectors)
+    (serial_id, target, port, metric, status, opened_at, last_seen_at,
+     finding_count, peak_severity, detectors)
 VALUES ($1, $2, $3, $4, 'open', $5, $5, $6, $7, $8)
 RETURNING id
 `
@@ -350,8 +363,8 @@ SET last_seen_at  = $2,
     finding_count = finding_count + 1,
     peak_severity = GREATEST(peak_severity, $3),
     detectors     = CASE
-                        WHEN $4::TEXT = ANY (detectors) THEN detectors
-                        ELSE array_append(detectors, $4::TEXT)
+                    WHEN $4::TEXT = ANY (detectors) THEN detectors
+                    ELSE array_append(detectors, $4::TEXT)
         END
 WHERE id = $1
 `
@@ -375,12 +388,13 @@ func (q *Queries) UpdateEventOnFinding(ctx context.Context, arg UpdateEventOnFin
 
 const upsertBaseline = `-- name: UpsertBaseline :exec
 INSERT INTO argus_baselines
-(serial_id, target, port, metric, detector, state, n, last_seen, updated_at)
+    (serial_id, target, port, metric, detector, state, n, last_seen, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
-ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET state      = EXCLUDED.state,
-                                                                      n          = EXCLUDED.n,
-                                                                      last_seen  = EXCLUDED.last_seen,
-                                                                      updated_at = now()
+ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET
+    state      = EXCLUDED.state,
+    n          = EXCLUDED.n,
+    last_seen  = EXCLUDED.last_seen,
+    updated_at = now()
 `
 
 type UpsertBaselineParams struct {
@@ -410,16 +424,18 @@ func (q *Queries) UpsertBaseline(ctx context.Context, arg UpsertBaselineParams) 
 
 const upsertPolicyState = `-- name: UpsertPolicyState :exec
 INSERT INTO argus_policy_state
-(serial_id, target, port, metric, status, score, score_updated_at,
- open_event_id, pending_findings, entered_status_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
-ON CONFLICT (serial_id, target, port, metric) DO UPDATE SET status            = EXCLUDED.status,
-                                                            score             = EXCLUDED.score,
-                                                            score_updated_at  = EXCLUDED.score_updated_at,
-                                                            open_event_id     = EXCLUDED.open_event_id,
-                                                            pending_findings  = EXCLUDED.pending_findings,
-                                                            entered_status_at = EXCLUDED.entered_status_at,
-                                                            updated_at        = now()
+    (serial_id, target, port, metric, detector,
+     status, score, score_updated_at,
+     open_event_id, pending_findings, entered_status_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET
+    status            = EXCLUDED.status,
+    score             = EXCLUDED.score,
+    score_updated_at  = EXCLUDED.score_updated_at,
+    open_event_id     = EXCLUDED.open_event_id,
+    pending_findings  = EXCLUDED.pending_findings,
+    entered_status_at = EXCLUDED.entered_status_at,
+    updated_at        = now()
 `
 
 type UpsertPolicyStateParams struct {
@@ -427,6 +443,7 @@ type UpsertPolicyStateParams struct {
 	Target          string
 	Port            int32
 	Metric          string
+	Detector        string
 	Status          string
 	Score           float64
 	ScoreUpdatedAt  pgtype.Timestamptz
@@ -441,6 +458,7 @@ func (q *Queries) UpsertPolicyState(ctx context.Context, arg UpsertPolicyStatePa
 		arg.Target,
 		arg.Port,
 		arg.Metric,
+		arg.Detector,
 		arg.Status,
 		arg.Score,
 		arg.ScoreUpdatedAt,

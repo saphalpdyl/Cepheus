@@ -12,6 +12,9 @@ type EwmaConfig struct {
 	Threshold float64
 	Warmup    int64
 	Epsilon   float64
+
+	// Severity
+	SeverityAlpha float32
 }
 type Ewma struct {
 	config EwmaConfig
@@ -42,7 +45,10 @@ func (e *Ewma) Step(_ context.Context, state *EwmaState, s types.Sample) *types.
 	var finding *types.Finding
 	if state.N >= e.config.Warmup && math.Abs(z) >= e.config.Threshold {
 		finding = &types.Finding{
-			TS: s.Timestamp,
+			TS:       s.Timestamp,
+			Value:    s.Value,
+			Severity: 1 + float64(e.config.SeverityAlpha)*math.Log10(1+math.Abs(z)),
+			Details:  nil,
 		}
 	}
 
@@ -52,6 +58,17 @@ func (e *Ewma) Step(_ context.Context, state *EwmaState, s types.Sample) *types.
 
 	state.N++
 	state.LastSeen = s.Timestamp
+
+	if finding != nil {
+		findingDetails := types.EwmaFindingDetails{
+			Z:        z,
+			Stddev:   stddev,
+			Variance: state.Variance,
+			N:        state.N,
+		}
+
+		finding.Details = &findingDetails
+	}
 
 	return finding
 }

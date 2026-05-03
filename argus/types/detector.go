@@ -17,3 +17,13 @@ type Sample struct {
 	Timestamp time.Time
 	Value     float64
 }
+
+// Finding details
+type EwmaFindingDetails struct {
+	Z        float64
+	Stddev   float64
+	Variance float64
+	N        int64
+}
+
+func (e *EwmaFindingDetails) DetectorName() string { return "ewma" }

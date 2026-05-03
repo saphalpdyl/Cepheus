@@ -18,7 +18,8 @@ import (
 type Argus struct {
 	InstanceId string
 
-	config DetectorConfig
+	config       DetectorConfig
+	policyEngine *PolicyEngine
 
 	logger *slog.Logger
 	pool   *pgxpool.Pool
@@ -44,6 +45,10 @@ func (d *Argus) Start(ctx context.Context) error {
 	d.pool = pool
 	d.query = argus_db.New(d.pool)
 
+	generateDbTransaction := func(ctx context.Context) (pgx.Tx, error) {
+		return d.pool.Begin(ctx)
+	}
+
 	interval := time.Duration(d.config.DetectionIntervalSeconds) * time.Second
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -51,13 +56,38 @@ func (d *Argus) Start(ctx context.Context) error {
 	d.logger.InfoContext(ctx, "argus running", "interval", interval)
 
 	ewma := NewEmwa(EwmaConfig{
-		Alpha:     0.001,
-		Threshold: 4,
-		Warmup:    40,
-		Epsilon:   1e-9,
+		Alpha:         0.001,
+		Threshold:     4,
+		Warmup:        40,
+		Epsilon:       1e-9,
+		SeverityAlpha: 2.2,
 	})
 
-	_ = NewPolicyEngine(PolicyEngineConfig{}, d.logger.With("DOMAIN", "POLICY_ENGINE"))
+	d.policyEngine, err = NewPolicyEngine(PolicyEngineConfig{
+		Logger: d.logger.With("DOMAIN", "POLICY_ENGINE"),
+		Query:  d.query,
+		LeakyBucketConfiguration: LeakyBucketConfiguration{
+			OpenThreshold:    8,
+			CloseThreshold:   3,
+			DecayPerSecond:   0.1,
+			BaseContribution: 1,
+			MagnitudeAlpha:   1.2,
+		},
+		LeakyBucketSweepInterval: 30,
+		QuietPeriod:              120 * time.Second,
+		ConfirmWindow:            60 * time.Second,
+		TransactionGenerator:     generateDbTransaction,
+	})
+	if err != nil {
+		d.logger.ErrorContext(ctx, "failed to init PolicyEngine", log.Err(err))
+		return err
+	}
+
+	err = d.policyEngine.Start(ctx)
+	if err != nil {
+		d.logger.ErrorContext(ctx, "failed to start PolicyEngine", log.Err(err))
+		return err
+	}
 
 	for {
 		select {
@@ -203,10 +233,39 @@ func (d *Argus) handleEWMA(
 			return nil, errors.New("invalid metric type")
 		}
 
-		_ = ewma.Step(ctx, &state, types.Sample{
+		finding := ewma.Step(ctx, &state, types.Sample{
 			Timestamp: sample.Timestamp.Time,
 			Value:     value,
 		})
+
+		if finding != nil {
+			seriesKey := types.SeriesKey{
+				SerialId: series.SerialID,
+				Target:   series.Target,
+				Port:     series.Port,
+				Metric:   metric,
+				Detector: finding.Details.DetectorName(),
+			}
+
+			findingId, err := d.policyEngine.InsertFinding(ctx, seriesKey, finding)
+
+			if err != nil {
+				d.logger.ErrorContext(ctx, "failed to insert finding in DB", log.Err(err))
+				return nil, err
+			}
+
+			findingUUID, err := findingId.UUIDValue()
+			if err != nil {
+				d.logger.ErrorContext(ctx, "failed to fetch finding UUID", log.Err(err))
+				return nil, err
+			}
+
+			err = d.policyEngine.ApplyFinding(ctx, seriesKey, finding, findingUUID)
+			if err != nil {
+				d.logger.ErrorContext(ctx, "failed to apply finding", log.Err(err))
+				return nil, err
+			}
+		}
 	}
 
 	return &state, nil
