@@ -8,7 +8,11 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY . .
+COPY agent/ ./agent
+COPY common/ ./common/
+COPY cepheus-agent.config.yaml ./cepheus-agent.config.yaml
+COPY telemetry/ ./telemetry/
+
 RUN CGO_ENABLED=0 go build -o /bin/agent ./cmd/agent
 
 FROM scratch

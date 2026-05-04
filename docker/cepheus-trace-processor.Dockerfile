@@ -7,7 +7,11 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY . .
+COPY trace-processor ./trace-processor/
+COPY common ./common/
+COPY cmd/trace-processor ./cmd/trace-processor/
+COPY telemetry/ ./telemetry/
+
 RUN CGO_ENABLED=0 go build -o /bin/cepheus-trace-processor ./cmd/trace-processor
 
 FROM alpine:3.21
