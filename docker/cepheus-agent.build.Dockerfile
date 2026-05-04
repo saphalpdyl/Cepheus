@@ -11,7 +11,11 @@ RUN go mod download
 COPY agent/ ./agent
 COPY common/ ./common/
 COPY cepheus-agent.config.yaml ./cepheus-agent.config.yaml
+COPY api/ ./api/
+COPY scamper-client/ ./scamper-client/
+COPY stamp/ ./stamp/
 COPY telemetry/ ./telemetry/
+COPY cmd/agent/ ./cmd/agent/
 
 RUN CGO_ENABLED=0 go build -o /bin/agent ./cmd/agent
 
