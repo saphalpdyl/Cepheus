@@ -3,7 +3,6 @@ package agent
 import (
 	"cepheus/agent/log"
 	"cepheus/api"
-	"cepheus/scamper-client"
 	goscamper "cepheus/scamper-client"
 	"cepheus/stamp"
 	"cepheus/telemetry"
@@ -135,7 +134,7 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 	defer dispatcher.Stop()
 
 	scamper, err := goscamper.NewClient(
-		scamper_client.ScamperClientConfig{
+		goscamper.ScamperClientConfig{
 			BinPath:    a.scamperBinPath,
 			SocketPath: "/tmp/scamper.sock",
 			PPS:        uint32(a.agentConfig.ScamperPPS),
@@ -186,6 +185,10 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 			api.TaskTypeTrace: NewTraceExecutor(
 				scamper,
 				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypeTrace)),
+			),
+			api.TaskTypePing: NewPingExecutor(
+				scamper,
+				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypePing)),
 			),
 		},
 	})

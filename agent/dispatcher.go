@@ -95,6 +95,8 @@ func (d *Dispatcher) Start(ctx context.Context, interval time.Duration) (err err
 					subject = fmt.Sprintf("cepheus.probe.stamp.%s", d.SerialID)
 				case common.ProbeTypeTrace:
 					subject = fmt.Sprintf("cepheus.probe.trace.%s", d.SerialID)
+				case common.ProbeTypePing:
+					subject = fmt.Sprintf("cepheus.probe.ping.%s", d.SerialID)
 				default:
 					d.logger.ErrorContext(ctx, fmt.Sprintf("invalid probe type, got %s", string(data.ProbeType)))
 				}

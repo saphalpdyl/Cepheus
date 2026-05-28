@@ -26,6 +26,7 @@ type ProbeType string
 const (
 	ProbeTypeStamp ProbeType = "stamp"
 	ProbeTypeTrace ProbeType = "trace"
+	ProbeTypePing  ProbeType = "ping"
 )
 
 // STAMP Data
@@ -46,6 +47,60 @@ type StampProbeData struct {
 	Rtt           time.Duration `json:"rtt,omitempty"`
 	ForwardDelay  time.Duration `json:"forward_delay,omitempty"`
 	BackwardDelay time.Duration `json:"backward_delay,omitempty"`
+}
+
+type PingDataPayload struct {
+	Type    string `json:"type"`
+	Version string `json:"version"`
+	Method  string `json:"method"`
+	Src     string `json:"src"`
+	Dst     string `json:"dst"`
+	Start   struct {
+		Sec  int `json:"sec"`
+		Usec int `json:"usec"`
+	} `json:"start"`
+	StopReason string `json:"stop_reason"`
+	StopData   int    `json:"stop_data"`
+	PingSent   int    `json:"ping_sent"`
+	ProbeSize  int    `json:"probe_size"`
+	Userid     int    `json:"userid"`
+	TTL        int    `json:"ttl"`
+	Tos        int    `json:"tos"`
+	Wait       int    `json:"wait"`
+	Timeout    int    `json:"timeout"`
+	Responses  []struct {
+		From      string `json:"from"`
+		ReplySize int    `json:"reply_size"`
+		ReplyTTL  int    `json:"reply_ttl"`
+		Seq       int    `json:"seq"`
+		Tx        struct {
+			Sec  int `json:"sec"`
+			Usec int `json:"usec"`
+		} `json:"tx"`
+		IcmpID     int    `json:"icmp_id"`
+		IcmpSeq    int    `json:"icmp_seq"`
+		ProbeIpid  int    `json:"probe_ipid"`
+		ReplyProto string `json:"reply_proto"`
+		Ifname     string `json:"ifname"`
+		Rx         struct {
+			Sec  int `json:"sec"`
+			Usec int `json:"usec"`
+		} `json:"rx"`
+		Rtt       float64 `json:"rtt"`
+		ReplyIpid int     `json:"reply_ipid"`
+		ReplyTos  int     `json:"reply_tos"`
+		IcmpType  int     `json:"icmp_type"`
+		IcmpCode  int     `json:"icmp_code"`
+	} `json:"responses"`
+	NoResponses []any `json:"no_responses"`
+	Statistics  struct {
+		Replies int     `json:"replies"`
+		Loss    int     `json:"loss"`
+		Min     float64 `json:"min"`
+		Max     float64 `json:"max"`
+		Avg     float64 `json:"avg"`
+		Stddev  float64 `json:"stddev"`
+	} `json:"statistics"`
 }
 
 // TraceRoute Data

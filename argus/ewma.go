@@ -59,6 +59,7 @@ func (e *Ewma) Step(_ context.Context, state *EwmaState, s types.Sample) *types.
 	state.N++
 	state.LastSeen = s.Timestamp
 
+	// attach finding if it exists
 	if finding != nil {
 		findingDetails := types.EwmaFindingDetails{
 			Z:        z,
