@@ -1,0 +1,23 @@
+ARG GO_VERSION=1.25.4
+
+FROM golang:${GO_VERSION}-alpine AS build
+
+RUN apk add --no-cache gcc musl-dev
+WORKDIR /src
+COPY go.mod go.sum* ./
+RUN go mod download
+
+COPY /ping-processor ./ping-processor/
+COPY /common ./common/
+COPY /cmd/ping-processor ./cmd/ping-processor/
+COPY telemetry/ ./telemetry/
+
+RUN CGO_ENABLED=0 go build -o /bin/cepheus-ping-processor ./cmd/ping-processor
+
+FROM alpine:3.21
+
+COPY --from=build /bin/cepheus-ping-processor /usr/local/bin/cepheus-ping-processor
+
+WORKDIR /app
+
+ENTRYPOINT [ "cepheus-ping-processor" ]

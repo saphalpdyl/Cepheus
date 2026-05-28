@@ -99,9 +99,14 @@ defmodule Cepheus.Dashboard do
 
   Uses the precomputed p95 columns (`rtt_p95_ns`, `fwd_p95_ns`, `bwd_p95_ns`) on
   `stamp_measurements`. Does NOT touch the `stamp_probes` hypertable.
+
+  When `targets` is `nil` (default) every target the device has reported is
+  included; pass a list of strings to restrict the result set.
   """
-  def summary_by_target(serial_id, window) when is_binary(serial_id) and is_binary(window) do
+  def summary_by_target(serial_id, window, targets \\ nil)
+      when is_binary(serial_id) and is_binary(window) and (is_list(targets) or is_nil(targets)) do
     interval = window_interval!(window)
+    {target_clause, params} = target_filter_clause(targets, [serial_id], "m.target")
 
     sql = """
     SELECT m.target,
@@ -119,11 +124,12 @@ defmodule Cepheus.Dashboard do
     FROM stamp_measurements m
     WHERE m.serial_id = $1
       AND m.timestamp > NOW() - INTERVAL '#{interval}'
+      #{target_clause}
     GROUP BY m.target
     ORDER BY m.target
     """
 
-    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [serial_id])
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, params)
 
     Enum.map(rows, fn [
                         target,
@@ -156,11 +162,15 @@ defmodule Cepheus.Dashboard do
   Time-bucketed RTT p95 series per target for the chart.
 
   Returns an ApexCharts-shaped list:
-      [%{name: target, data: [[unix_ms, rtt_p95_ns], ...]}, ...]
+      [%{name: "RTT · target", data: [[unix_ms, rtt_p95_ns], ...]}, ...]
+
+  Pass `targets` (list of strings) to restrict to a subset.
   """
-  def measurement_timeseries(serial_id, window) when is_binary(serial_id) and is_binary(window) do
+  def measurement_timeseries(serial_id, window, targets \\ nil)
+      when is_binary(serial_id) and is_binary(window) and (is_list(targets) or is_nil(targets)) do
     interval = window_interval!(window)
     bucket = window_bucket!(window)
+    {target_clause, params} = target_filter_clause(targets, [serial_id], "m.target")
 
     sql = """
     SELECT time_bucket(INTERVAL '#{bucket}', m.timestamp) AS bucket,
@@ -171,11 +181,12 @@ defmodule Cepheus.Dashboard do
     FROM stamp_measurements m
     WHERE m.serial_id = $1
       AND m.timestamp > NOW() - INTERVAL '#{interval}'
+      #{target_clause}
     GROUP BY bucket, m.target
     ORDER BY m.target, bucket
     """
 
-    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [serial_id])
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, params)
 
     rows
     |> Enum.group_by(fn [_bucket, target, _rtt, _fwd, _bwd] -> target end)
@@ -196,12 +207,171 @@ defmodule Cepheus.Dashboard do
         end)
 
       [
-        %{name: "RTT", data: rtt_data},
-        %{name: "Forward", data: fwd_data},
-        %{name: "Backward", data: bwd_data}
+        %{name: "RTT · #{target}", data: rtt_data},
+        %{name: "Forward · #{target}", data: fwd_data},
+        %{name: "Backward · #{target}", data: bwd_data}
       ]
     end)
     |> Enum.sort_by(& &1.name)
+  end
+
+  @target_list_window "24 hours"
+
+  @doc """
+  Distinct STAMP targets seen for this device in the last 24 hours.
+
+  Used to populate the target selector. The window is wider than the chart
+  window so a target the user briefly stops probing doesn't disappear from
+  the selector.
+  """
+  def list_stamp_targets(serial_id) when is_binary(serial_id) do
+    sql = """
+    SELECT DISTINCT target
+    FROM stamp_measurements
+    WHERE serial_id = $1
+      AND timestamp > NOW() - INTERVAL '#{@target_list_window}'
+    ORDER BY target
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [serial_id])
+    Enum.map(rows, fn [t] -> t end)
+  end
+
+  @doc """
+  Per-target ping rollup over the window, read from `ping_measurements`.
+  """
+  def ping_summary_by_target(serial_id, window, targets \\ nil)
+      when is_binary(serial_id) and is_binary(window) and (is_list(targets) or is_nil(targets)) do
+    interval = window_interval!(window)
+    {target_clause, params} = target_filter_clause(targets, [serial_id], "m.target")
+
+    sql = """
+    SELECT m.target,
+           SUM(m.sent)::BIGINT                                 AS sent,
+           SUM(m.received)::BIGINT                             AS received,
+           CASE WHEN SUM(m.sent) = 0 THEN NULL
+                ELSE 1.0 - (SUM(m.received)::float / SUM(m.sent))
+           END                                                 AS loss,
+           AVG(m.rtt_avg_ns)::BIGINT                           AS avg_rtt_ns,
+           MIN(m.rtt_min_ns)                                   AS min_rtt_ns,
+           MAX(m.rtt_max_ns)                                   AS max_rtt_ns,
+           AVG(m.rtt_p95_ns)::BIGINT                           AS avg_p95_ns,
+           COUNT(*)                                            AS measurements,
+           MAX(m.timestamp)                                    AS last_seen
+    FROM ping_measurements m
+    WHERE m.serial_id = $1
+      AND m.timestamp > NOW() - INTERVAL '#{interval}'
+      #{target_clause}
+    GROUP BY m.target
+    ORDER BY m.target
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, params)
+
+    Enum.map(rows, fn [
+                        target,
+                        sent,
+                        received,
+                        loss,
+                        avg_rtt,
+                        min_rtt,
+                        max_rtt,
+                        avg_p95,
+                        measurements,
+                        last_seen
+                      ] ->
+      %{
+        target: target,
+        sent: sent,
+        received: received,
+        loss: loss,
+        avg_rtt_ns: avg_rtt,
+        min_rtt_ns: min_rtt,
+        max_rtt_ns: max_rtt,
+        avg_p95_ns: avg_p95,
+        measurements: measurements,
+        last_seen: last_seen
+      }
+    end)
+  end
+
+  @doc """
+  Time-bucketed ping series per target. Returns ApexCharts shape with one
+  series per target (avg RTT).
+  """
+  def ping_timeseries(serial_id, window, targets \\ nil)
+      when is_binary(serial_id) and is_binary(window) and (is_list(targets) or is_nil(targets)) do
+    interval = window_interval!(window)
+    bucket = window_bucket!(window)
+    {target_clause, params} = target_filter_clause(targets, [serial_id], "m.target")
+
+    sql = """
+    SELECT time_bucket(INTERVAL '#{bucket}', m.timestamp) AS bucket,
+           m.target,
+           AVG(m.rtt_avg_ns)::BIGINT                      AS rtt_avg_ns,
+           AVG(m.rtt_p95_ns)::BIGINT                      AS rtt_p95_ns
+    FROM ping_measurements m
+    WHERE m.serial_id = $1
+      AND m.timestamp > NOW() - INTERVAL '#{interval}'
+      #{target_clause}
+    GROUP BY bucket, m.target
+    ORDER BY m.target, bucket
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, params)
+
+    rows
+    |> Enum.group_by(fn [_bucket, target, _avg, _p95] -> target end)
+    |> Enum.flat_map(fn {target, points} ->
+      avg_data =
+        Enum.map(points, fn [%DateTime{} = bucket, _target, avg, _p95] ->
+          [DateTime.to_unix(bucket, :millisecond), avg]
+        end)
+
+      p95_data =
+        Enum.map(points, fn [%DateTime{} = bucket, _target, _avg, p95] ->
+          [DateTime.to_unix(bucket, :millisecond), p95]
+        end)
+
+      [
+        %{name: "avg · #{target}", data: avg_data},
+        %{name: "p95 · #{target}", data: p95_data}
+      ]
+    end)
+    |> Enum.sort_by(& &1.name)
+  end
+
+  @doc """
+  Distinct ping targets seen for this device in the last 24 hours.
+  """
+  def list_ping_targets(serial_id) when is_binary(serial_id) do
+    sql = """
+    SELECT DISTINCT target
+    FROM ping_measurements
+    WHERE serial_id = $1
+      AND timestamp > NOW() - INTERVAL '#{@target_list_window}'
+    ORDER BY target
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [serial_id])
+    Enum.map(rows, fn [t] -> t end)
+  end
+
+  # Builds a SQL fragment + parameter list for an optional `target IN (...)` filter.
+  # Returns `{"", params}` when no filter is applied so the caller can splice the
+  # fragment after the static WHERE clauses.
+  defp target_filter_clause(nil, params, _col), do: {"", params}
+
+  defp target_filter_clause(targets, params, col) when is_list(targets) do
+    case targets do
+      [] ->
+        # An empty selection means "no targets" — force zero rows.
+        {"AND FALSE", params}
+
+      _ ->
+        idx = length(params) + 1
+        {"AND #{col} = ANY($#{idx}::text[])", params ++ [targets]}
+    end
   end
 
   @doc """

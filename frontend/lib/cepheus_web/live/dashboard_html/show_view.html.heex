@@ -51,6 +51,11 @@
         STAMP RTT p95 (per target)
       </h2>
     </div>
+    <.target_selector
+      event="set_stamp_targets"
+      available={@stamp_targets}
+      selected={@selected_stamp_targets}
+    />
     <div
       id="rtt-chart"
       phx-hook=".RttChart"
@@ -139,6 +144,134 @@
             <td class="text-right tabular-nums">{fmt_rtt(r.max_rtt_p95_ns)}</td>
             <td class="text-right tabular-nums">{fmt_rtt(r.avg_fwd_p95_ns)}</td>
             <td class="text-right tabular-nums">{fmt_rtt(r.avg_bwd_p95_ns)}</td>
+            <td class="text-right tabular-nums">{r.measurements}</td>
+            <td>{fmt_dt(r.last_seen)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="stats stats-vertical sm:stats-horizontal w-full bg-base-100 border border-base-300 shadow-sm">
+  <div class="stat">
+    <div class="stat-title">Ping targets</div>
+    <div class="stat-value text-2xl">{@ping_kpis.targets}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Ping measurements</div>
+    <div class="stat-value text-2xl tabular-nums">{@ping_kpis.measurements}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Avg ping RTT</div>
+    <div class="stat-value text-2xl tabular-nums">{fmt_rtt(@ping_kpis.avg_rtt_ns)}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Worst ping loss</div>
+    <div class="stat-value text-2xl tabular-nums">{fmt_loss(@ping_kpis.worst_loss)}</div>
+  </div>
+</section>
+
+<section class="card bg-base-100 border border-base-300">
+  <div class="card-body gap-3">
+    <div class="flex items-center justify-between">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/70">
+        Ping RTT (per target)
+      </h2>
+    </div>
+    <.target_selector
+      event="set_ping_targets"
+      available={@ping_targets}
+      selected={@selected_ping_targets}
+    />
+    <div
+      id="ping-chart"
+      phx-hook=".PingChart"
+      phx-update="ignore"
+      class="h-72 w-full"
+    >
+    </div>
+    <p :if={@ping_summary == []} class="text-center text-sm text-base-content/60">
+      No samples in window.
+    </p>
+  </div>
+</section>
+<script :type={Phoenix.LiveView.ColocatedHook} name=".PingChart">
+  import ApexCharts from "apexcharts"
+
+  const baseOptions = (isDark) => ({
+    chart: {
+      type: "line",
+      height: "100%",
+      background: "transparent",
+      animations: { enabled: false },
+      toolbar: { show: false },
+      zoom: { enabled: false }
+    },
+    theme: { mode: isDark ? "dark" : "light" },
+    stroke: { curve: "smooth", width: 2 },
+    dataLabels: { enabled: false },
+    legend: { position: "top", horizontalAlign: "right" },
+    grid: { borderColor: isDark ? "#2a2e37" : "#e5e7eb", strokeDashArray: 3 },
+    xaxis: { type: "datetime", labels: { datetimeUTC: false } },
+    yaxis: {
+      labels: {
+        formatter: v => v == null ? "" : (v / 1_000_000).toFixed(2) + " ms"
+      }
+    },
+    tooltip: {
+      theme: isDark ? "dark" : "light",
+      x: { format: "HH:mm:ss" },
+      y: { formatter: v => v == null ? "—" : (v / 1_000_000).toFixed(3) + " ms" }
+    },
+    series: []
+  })
+
+  export default {
+    mounted() {
+      const isDark = document.documentElement.dataset.theme === "dark"
+      this.chart = new ApexCharts(this.el, baseOptions(isDark))
+      this.chart.render()
+      this.handleEvent("ping-chart:update", ({ series }) => {
+        this.chart.updateSeries(series, true)
+      })
+    },
+    destroyed() {
+      this.chart?.destroy()
+    }
+  }
+</script>
+
+<section class="card bg-base-100 border border-base-300">
+  <div class="card-body gap-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/70">
+      Ping targets (last {@window})
+    </h2>
+    <p :if={@ping_summary == []} class="text-sm text-base-content/60">No samples in window.</p>
+    <div :if={@ping_summary != []} class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>target</th>
+            <th class="text-right">probes</th>
+            <th class="text-right">loss</th>
+            <th class="text-right">avg RTT</th>
+            <th class="text-right">min RTT</th>
+            <th class="text-right">max RTT</th>
+            <th class="text-right">avg p95</th>
+            <th class="text-right">batches</th>
+            <th>last seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for={r <- @ping_summary}>
+            <td class="font-mono">{r.target}</td>
+            <td class="text-right tabular-nums">{r.received}/{r.sent}</td>
+            <td class="text-right tabular-nums">{fmt_loss(r.loss)}</td>
+            <td class="text-right tabular-nums">{fmt_rtt(r.avg_rtt_ns)}</td>
+            <td class="text-right tabular-nums">{fmt_rtt(r.min_rtt_ns)}</td>
+            <td class="text-right tabular-nums">{fmt_rtt(r.max_rtt_ns)}</td>
+            <td class="text-right tabular-nums">{fmt_rtt(r.avg_p95_ns)}</td>
             <td class="text-right tabular-nums">{r.measurements}</td>
             <td>{fmt_dt(r.last_seen)}</td>
           </tr>

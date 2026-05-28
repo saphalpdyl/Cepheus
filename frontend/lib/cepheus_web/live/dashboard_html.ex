@@ -31,6 +31,38 @@ defmodule CepheusWeb.DashboardHTML do
     """
   end
 
+  attr :event, :string, required: true
+  attr :available, :list, required: true
+  attr :selected, :any, required: true, doc: "nil (all) or list of selected target strings"
+  attr :label, :string, default: "Targets"
+
+  @doc """
+  A horizontal chip-list of checkboxes for filtering visualizations by target.
+  Submits the full selection on every change via `phx-change={@event}`. A `nil`
+  selection means "all" and renders every box as checked.
+  """
+  def target_selector(assigns) do
+    ~H"""
+    <form phx-change={@event} class="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span class="text-xs text-base-content/70">{@label}:</span>
+      <span :if={@available == []} class="text-xs text-base-content/50">no targets yet</span>
+      <label :for={t <- @available} class="flex cursor-pointer items-center gap-1">
+        <input
+          type="checkbox"
+          name="targets[]"
+          value={t}
+          checked={target_checked?(@selected, t)}
+          class="checkbox checkbox-xs"
+        />
+        <span class="font-mono text-xs">{t}</span>
+      </label>
+    </form>
+    """
+  end
+
+  def target_checked?(nil, _t), do: true
+  def target_checked?(selected, t) when is_list(selected), do: t in selected
+
   def short_uuid(nil), do: ""
   def short_uuid(uuid) when is_binary(uuid), do: String.slice(uuid, 0, 8) <> "…"
 

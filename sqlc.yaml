@@ -26,6 +26,15 @@ sql:
         out: "stamp-processor/db/"
         sql_package: "pgx/v5"
   - engine: "postgresql"
+    queries: "db/queries/processors/ping-processor/"
+    schema:
+      - "db/init/08-ping.sql"
+    gen:
+      go:
+        package: "pingprocessor_db"
+        out: "ping-processor/db/"
+        sql_package: "pgx/v5"
+  - engine: "postgresql"
     queries: "db/queries/argus/"
     schema:
       - "db/init/02-stamp.sql"
