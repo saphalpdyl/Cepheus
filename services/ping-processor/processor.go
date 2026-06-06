@@ -163,19 +163,19 @@ func (s *PingProcessor) Start(ctx context.Context) error {
 
 func (s *PingProcessor) insertPingData(
 	ctx context.Context,
-	serialId string,
-	agentConfigId *string,
+	serialID string,
+	agentConfigID *string,
 	timestamp time.Time,
 	pingData common.PingDataPayload,
 ) error {
-	parsedAgentConfigId := &pgtype.UUID{
+	parsedAgentConfigID := &pgtype.UUID{
 		Bytes: [16]byte{},
 		Valid: false,
 	}
 
-	if agentConfigId != nil {
+	if agentConfigID != nil {
 		var err error
-		parsedAgentConfigId, err = processor_shared.UUID(*agentConfigId)
+		parsedAgentConfigID, err = processor_shared.UUID(*agentConfigID)
 		if err != nil {
 			s.logger.ErrorContext(ctx, "failed to parse agent config id", log.Err(err))
 		}
@@ -204,8 +204,8 @@ func (s *PingProcessor) insertPingData(
 
 	measurement, err := s.query.WithTx(tx).InsertPingMeasurement(ctx, pingprocessor_db.InsertPingMeasurementParams{
 		Timestamp:     pgtype.Timestamptz{Time: timestamp, Valid: true},
-		SerialID:      serialId,
-		AgentConfigID: *parsedAgentConfigId,
+		SerialID:      serialID,
+		AgentConfigID: *parsedAgentConfigID,
 		Target:        pingData.Dst,
 		Sent:          sent,
 		Received:      received,

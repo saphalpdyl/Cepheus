@@ -1,5 +1,4 @@
 package traceprocessor
-
 import (
 	"cepheus/libs/common"
 	processor_shared "cepheus/libs/common/pgx"
@@ -352,6 +351,7 @@ func (s *TraceProcessor) enrichMissingHops(ctx context.Context, allIPs []netip.A
 		s.logger.ErrorContext(ctx, "failed to lookup missing ips", log.Err(err))
 		return err
 	}
+
 
 	var asDetails []traceprocessor_db.UpsertAsDetailsParams
 
