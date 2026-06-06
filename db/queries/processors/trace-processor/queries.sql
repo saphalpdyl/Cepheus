@@ -28,3 +28,7 @@ SELECT ip FROM as_details WHERE ip = ANY(@ips::inet[]);
 INSERT INTO as_details
     (ip, asn, bgp_prefix, name, cc)
 VALUES ($1, $2, $3, $4, $5);
+
+-- name: GetASNForIPs :many
+SELECT ip, asn FROM as_details
+WHERE ip = ANY(@ips::inet[]);

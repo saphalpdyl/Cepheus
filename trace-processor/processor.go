@@ -256,7 +256,7 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			IcmpType:      processor_shared.Int4(hop.IcmpType),
 			IcmpCode:      processor_shared.Int4(hop.IcmpCode),
 			ReplyTtl:      processor_shared.Int4(hop.ReplyTTL),
-			Asn:           processor_shared.Int4(0),
+			Asn:           processor_shared.Int4(0), // We add ASN details below
 			IsNoHop:       false,
 		})
 	}
@@ -269,6 +269,22 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 
 	if err = s.enrichMissingHops(ctx, hopIPs, existingIPs, tx); err != nil {
 		return err
+	}
+
+	// Add ASN details for all hops
+	asnMap, err := s.getIPToASNMap(ctx, hopIPs, tx)
+	if err != nil {
+		return err
+	}
+
+	for _, hop := range traceHops {
+		fetchedASN, ok := asnMap[*hop.Ip]
+		if !ok {
+			hop.Asn = pgtype.Int4{Valid: false} // set as NULL
+			continue
+		}
+
+		hop.Asn = fetchedASN
 	}
 
 	for _, hop := range traceDataPayload.NoHops {
@@ -300,6 +316,22 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 	return nil
 }
 
+func (s *TraceProcessor) getIPToASNMap(ctx context.Context, ips []netip.Addr, tx pgx.Tx) (map[netip.Addr]pgtype.Int4, error) {
+	rows, err := s.query.WithTx(tx).GetASNForIPs(ctx, ips)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to query ips", log.Err(err))
+		return nil, err
+	}
+
+	ipToASNMap := make(map[netip.Addr]pgtype.Int4)
+	for _, row := range rows {
+		ipToASNMap[row.Ip] = row.Asn
+	}
+
+	return ipToASNMap, err
+}
+
+// Missing hops refer to hops that have no corresponding as_details row
 func (s *TraceProcessor) enrichMissingHops(ctx context.Context, allIPs []netip.Addr, existingIPs []netip.Addr, tx pgx.Tx) error {
 	// Get non-existing IPs
 	existingIPsSet := make(map[netip.Addr]bool)
