@@ -12,6 +12,36 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getASNForIPs = `-- name: GetASNForIPs :many
+SELECT ip, asn FROM as_details
+WHERE ip = ANY($1::inet[])
+`
+
+type GetASNForIPsRow struct {
+	Ip  netip.Addr
+	Asn pgtype.Int4
+}
+
+func (q *Queries) GetASNForIPs(ctx context.Context, ips []netip.Addr) ([]GetASNForIPsRow, error) {
+	rows, err := q.db.Query(ctx, getASNForIPs, ips)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetASNForIPsRow
+	for rows.Next() {
+		var i GetASNForIPsRow
+		if err := rows.Scan(&i.Ip, &i.Asn); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getExistingIPs = `-- name: GetExistingIPs :many
 SELECT ip FROM as_details WHERE ip = ANY($1::inet[])
 `
