@@ -7,12 +7,11 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY /argus/ ./argus/
-COPY /common/ ./common/
-COPY /cmd/argus ./cmd/argus/
-COPY telemetry/ ./telemetry/
+COPY services/argus/ ./services/argus/
+COPY libs/common/ ./libs/common/
+COPY libs/telemetry/ ./libs/telemetry/
 
-RUN CGO_ENABLED=0 go build -o /bin/cepheus-argus ./cmd/argus
+RUN CGO_ENABLED=0 go build -o /bin/cepheus-argus ./services/argus/cmd
 
 FROM alpine:3.21
 

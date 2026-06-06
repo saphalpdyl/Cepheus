@@ -55,8 +55,8 @@ test.build:
 test.integration: test.build
 	docker compose -f docker-compose.test.yaml down
 	docker compose -f docker-compose.test.yaml up -d
-	go test -v -tags integration ./stamp/tests/integration
-	docker compose -f docker-compose.test.yaml exec scamper-test-suite go test -v -tags integration /app/scamper-client/tests/integration
+	go test -v -tags integration ./libs/stamp/tests/integration
+	docker compose -f docker-compose.test.yaml exec scamper-test-suite go test -v -tags integration /app/libs/scamper-client/tests/integration
 	docker compose -f docker-compose.test.yaml down
 
 # Generators

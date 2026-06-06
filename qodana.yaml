@@ -41,20 +41,20 @@ exclude:
     paths:
       - api
       - api/payload.go
-      - agent
-      - agent/log
-      - agent/log/attr.go
-      - agent/agent.go
-      - agent/dispatcher.go
-      - agent/executor_stamp_reflector.go
-      - agent/executor_stamp_sender.go
-      - agent/task.go
-      - server
-      - server/handler
-      - server/handler/handler.go
-      - server/log
-      - server/log/attr.go
-      - server/server.go
+      - services/agent
+      - services/agent/log
+      - services/agent/log/attr.go
+      - services/agent/agent.go
+      - services/agent/dispatcher.go
+      - services/agent/executor_stamp_reflector.go
+      - services/agent/executor_stamp_sender.go
+      - services/agent/task.go
+      - services/server
+      - services/server/handler
+      - services/server/handler/handler.go
+      - services/server/log
+      - services/server/log/attr.go
+      - services/server/server.go
       - cmd
       - cmd/cepheus-agent
       - cmd/cepheus-agent/main.go
@@ -65,9 +65,9 @@ exclude:
       - cmd/processors/stamp-processor/main.go
       - cmd/processors/trace-processor
       - cmd/processors/trace-processor/main.go
-      - common
-      - common/doc.go
-      - common/types.go
+      - libs/common
+      - libs/common/doc.go
+      - libs/common/types.go
       - processors
       - processors/shared
       - processors/shared/log
@@ -84,12 +84,12 @@ exclude:
       - scamper/client.go
       - scamper/doc.go
       - scamper/types.go
-      - stamp
-      - stamp/error_estimate.go
-      - stamp/reflector.go
-      - stamp/sender.go
-      - stamp/timestamp.go
-      - telemetry
-      - telemetry/logging.go
-      - telemetry/tracing.go
+      - libs/stamp
+      - libs/stamp/error_estimate.go
+      - libs/stamp/reflector.go
+      - libs/stamp/sender.go
+      - libs/stamp/timestamp.go
+      - libs/telemetry
+      - libs/telemetry/logging.go
+      - libs/telemetry/tracing.go
       - go.mod
