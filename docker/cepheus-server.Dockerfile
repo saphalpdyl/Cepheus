@@ -8,15 +8,13 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY server/ ./server/
+COPY services/server/ ./services/server/
 COPY api/ ./api/
 COPY cepheus-server.config.yaml ./cepheus-server.config.yaml
-COPY common/ ./common/
-COPY telemetry/ ./telemetry/
-COPY cmd/server ./cmd/server/
+COPY libs/common/ ./libs/common/
+COPY libs/telemetry/ ./libs/telemetry/
 
-
-RUN CGO_ENABLED=0 go build -o /bin/server ./cmd/server
+RUN CGO_ENABLED=0 go build -o /bin/server ./services/server/cmd
 
 FROM alpine:3.21
 

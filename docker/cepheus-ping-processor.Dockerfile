@@ -7,12 +7,11 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY /ping-processor ./ping-processor/
-COPY /common ./common/
-COPY /cmd/ping-processor ./cmd/ping-processor/
-COPY telemetry/ ./telemetry/
+COPY services/ping-processor ./services/ping-processor/
+COPY libs/common ./libs/common/
+COPY libs/telemetry/ ./libs/telemetry/
 
-RUN CGO_ENABLED=0 go build -o /bin/cepheus-ping-processor ./cmd/ping-processor
+RUN CGO_ENABLED=0 go build -o /bin/cepheus-ping-processor ./services/ping-processor/cmd
 
 FROM alpine:3.21
 

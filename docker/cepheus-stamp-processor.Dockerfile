@@ -7,12 +7,11 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY /stamp-processor ./stamp-processor/
-COPY /common ./common/
-COPY /cmd/stamp-processor ./cmd/stamp-processor/
-COPY telemetry/ ./telemetry/
+COPY services/stamp-processor ./services/stamp-processor/
+COPY libs/common ./libs/common/
+COPY libs/telemetry/ ./libs/telemetry/
 
-RUN CGO_ENABLED=0 go build -o /bin/cepheus-stamp-processor ./cmd/stamp-processor
+RUN CGO_ENABLED=0 go build -o /bin/cepheus-stamp-processor ./services/stamp-processor/cmd
 
 FROM alpine:3.21
 

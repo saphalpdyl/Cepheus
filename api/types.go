@@ -1,7 +1,7 @@
 package api
 
 import (
-	"cepheus/common"
+	"cepheus/libs/common"
 	"encoding/json"
 	"fmt"
 	"time"

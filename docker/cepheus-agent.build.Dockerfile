@@ -8,16 +8,15 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 
-COPY agent/ ./agent
-COPY common/ ./common/
+COPY services/agent/ ./services/agent/
+COPY libs/common/ ./libs/common/
 COPY cepheus-agent.config.yaml ./cepheus-agent.config.yaml
 COPY api/ ./api/
-COPY scamper-client/ ./scamper-client/
-COPY stamp/ ./stamp/
-COPY telemetry/ ./telemetry/
-COPY cmd/agent/ ./cmd/agent/
+COPY libs/scamper-client/ ./libs/scamper-client/
+COPY libs/stamp/ ./libs/stamp/
+COPY libs/telemetry/ ./libs/telemetry/
 
-RUN CGO_ENABLED=0 go build -o /bin/agent ./cmd/agent
+RUN CGO_ENABLED=0 go build -o /bin/agent ./services/agent/cmd
 
 FROM scratch
 COPY --from=build /bin/agent /cepheus-agent/cepheus-agent

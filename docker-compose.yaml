@@ -144,7 +144,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     volumes:
-      - ./telemetry/otel-collector.yaml:/etc/otelcol-contrib/config.yaml
+      - ./libs/telemetry/otel-collector.yaml:/etc/otelcol-contrib/config.yaml
     ports:
       - "4318:4318"   # OTLP HTTP
       - "8889:8889"   # Prometheus metrics exporter
@@ -152,21 +152,21 @@ services:
   tempo:
     image: grafana/tempo:2.7.2
     volumes:
-      - ./telemetry/tempo.yaml:/etc/tempo.yaml
+      - ./libs/telemetry/tempo.yaml:/etc/tempo.yaml
       - tempo-data:/var/tempo
     command: ["-config.file=/etc/tempo.yaml"]
 
   loki:
     image: grafana/loki:latest
     volumes:
-      - ./telemetry/loki.yaml:/etc/loki/local-config.yaml
+      - ./libs/telemetry/loki.yaml:/etc/loki/local-config.yaml
       - loki-data:/loki
     command: ["-config.file=/etc/loki/local-config.yaml"]
 
   grafana:
     image: grafana/grafana:latest
     volumes:
-      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning
+      - ./libs/telemetry/grafana/provisioning:/etc/grafana/provisioning
       - grafana-data:/var/lib/grafana
     ports:
       - "3001:3000"
