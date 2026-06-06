@@ -277,14 +277,14 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		return err
 	}
 
-	for _, hop := range traceHops {
-		fetchedASN, ok := asnMap[*hop.Ip]
+	for i := range traceHops {
+		fetchedASN, ok := asnMap[*traceHops[i].Ip]
 		if !ok {
-			hop.Asn = pgtype.Int4{Valid: false} // set as NULL
+			traceHops[i].Asn = pgtype.Int4{Valid: false} // set as NULL
 			continue
 		}
 
-		hop.Asn = fetchedASN
+		traceHops[i].Asn = fetchedASN
 	}
 
 	for _, hop := range traceDataPayload.NoHops {
