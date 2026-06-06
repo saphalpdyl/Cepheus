@@ -362,6 +362,11 @@ func (s *TraceProcessor) enrichMissingHops(ctx context.Context, allIPs []netip.A
 			return err
 		}
 
+		if r.ASN == 0 {
+			// this is the case for private IPs RFC 1918
+			continue
+		}
+
 		asDetails = append(asDetails, traceprocessor_db.UpsertAsDetailsParams{
 			Ip:  ip,
 			Asn: processor_shared.Int4(r.ASN),
