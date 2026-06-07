@@ -223,3 +223,22 @@ type UpsertAsDetailsParams struct {
 	Name      pgtype.Text
 	Cc        pgtype.Text
 }
+
+const upsertFingerprintHash = `-- name: UpsertFingerprintHash :one
+UPDATE trace_measurements
+SET path_hash = $1
+WHERE id = $2
+RETURNING path_hash
+`
+
+type UpsertFingerprintHashParams struct {
+	PathHash string
+	ID       pgtype.UUID
+}
+
+func (q *Queries) UpsertFingerprintHash(ctx context.Context, arg UpsertFingerprintHashParams) (string, error) {
+	row := q.db.QueryRow(ctx, upsertFingerprintHash, arg.PathHash, arg.ID)
+	var path_hash string
+	err := row.Scan(&path_hash)
+	return path_hash, err
+}

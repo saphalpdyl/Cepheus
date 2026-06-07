@@ -89,10 +89,125 @@ defmodule Cepheus.Dashboard do
         schedule_interval_seconds: interval,
         schedule_jitter_percent: jitter,
         schedule_enabled: sched_enabled,
-        params: params
+        params: decode_params(params)
       }
     end)
   end
+
+  # ---------------------------------------------------------------------------
+  # Probe task authoring (frontend task editor)
+  # ---------------------------------------------------------------------------
+
+  @doc "Task types selectable in the UI, as `{label, value}` pairs."
+  def task_types do
+    [
+      {"Traceroute", "trace"},
+      {"Ping", "ping"},
+      {"STAMP sender", "stamp-sender"},
+      {"STAMP reflector", "stamp-reflector"}
+    ]
+  end
+
+  def task_type_label(type),
+    do: Enum.find_value(task_types(), type, fn {label, value} -> value == type && label end)
+
+  def task_has_target?(type), do: type in ["trace", "tracelb", "ping", "stamp-sender"]
+  def task_has_port?(type), do: type in ["stamp-sender", "stamp-reflector"]
+  def task_schedulable?(type), do: type != "stamp-reflector"
+
+  def port_label("stamp-reflector"), do: "listen port"
+  def port_label(_), do: "port"
+
+  def default_interval("trace"), do: 40
+  def default_interval("tracelb"), do: 40
+  def default_interval("ping"), do: 20
+  def default_interval("stamp-sender"), do: 10
+  def default_interval(_), do: 30
+
+  def default_port(type), do: if(task_has_port?(type), do: "862", else: "")
+
+  @doc """
+  Distinct traceroute targets (among the queued `rows` plus the config's
+  `existing_tasks`) that have no companion ping/STAMP-sender probe to the same
+  IP. Traceroute needs a latency probe to the same target, so the UI uses this
+  to nudge the user.
+  """
+  def recommended_trace_targets(rows, existing_tasks) do
+    covered =
+      (Enum.map(rows, fn r -> {r.type, String.trim(r.target || "")} end) ++
+         Enum.map(existing_tasks, fn t -> {t.type, Map.get(t.params || %{}, "target", "")} end))
+      |> Enum.filter(fn {type, target} -> type in ["ping", "stamp-sender"] and target != "" end)
+      |> MapSet.new(fn {_type, target} -> target end)
+
+    rows
+    |> Enum.filter(fn r -> r.type in ["trace", "tracelb"] end)
+    |> Enum.map(fn r -> String.trim(r.target || "") end)
+    |> Enum.reject(fn target -> target == "" or MapSet.member?(covered, target) end)
+    |> Enum.uniq()
+  end
+
+  @doc """
+  Inserts new agent tasks for a config and bumps the config generation (so the
+  agent reconciles on its next pull). Runs in a single transaction.
+
+  `tasks` is a list of maps with keys `:task_id`, `:type`, `:params` (a map),
+  `:schedule_enabled`, `:schedule_interval_seconds`, `:schedule_jitter_percent`.
+  Returns `{:ok, new_generation}` or `{:error, message}`.
+  """
+  def add_tasks(agent_config_id, tasks) when is_binary(agent_config_id) and is_list(tasks) do
+    uuid = Ecto.UUID.dump!(agent_config_id)
+
+    Repo.transaction(fn ->
+      %Postgrex.Result{rows: [[generation]]} =
+        Ecto.Adapters.SQL.query!(
+          Repo,
+          "UPDATE agent_config SET generation = generation + 1, updated_at = NOW() WHERE id = $1 RETURNING generation",
+          [uuid]
+        )
+
+      Enum.each(tasks, fn t ->
+        Ecto.Adapters.SQL.query!(
+          Repo,
+          """
+          INSERT INTO agent_task
+            (agent_config_id, task_id, type, enabled, generation,
+             schedule_interval_seconds, schedule_jitter_percent, schedule_enabled, params)
+          VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8::jsonb)
+          """,
+          [
+            uuid,
+            t.task_id,
+            t.type,
+            generation,
+            t.schedule_interval_seconds,
+            t.schedule_jitter_percent,
+            t.schedule_enabled,
+            t.params
+          ]
+        )
+      end)
+
+      generation
+    end)
+    |> case do
+      {:ok, generation} -> {:ok, generation}
+      {:error, reason} -> {:error, inspect(reason)}
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  # jsonb columns come back from raw SQL as JSON strings here; normalize to a map.
+  defp decode_params(params) when is_map(params), do: params
+
+  defp decode_params(params) when is_binary(params) do
+    case Jason.decode(params) do
+      {:ok, map} when is_map(map) -> map
+      _ -> %{}
+    end
+  end
+
+  defp decode_params(_), do: %{}
 
   @doc """
   Per-target rollup over the window, read from `stamp_measurements` only.

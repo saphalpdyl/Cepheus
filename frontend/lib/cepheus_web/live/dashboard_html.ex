@@ -9,6 +9,8 @@ defmodule CepheusWeb.DashboardHTML do
   """
   use CepheusWeb, :html
 
+  alias Cepheus.Dashboard
+
   embed_templates "dashboard_html/*"
 
   attr :window, :string, required: true
@@ -62,6 +64,150 @@ defmodule CepheusWeb.DashboardHTML do
 
   def target_checked?(nil, _t), do: true
   def target_checked?(selected, t) when is_list(selected), do: t in selected
+
+  attr :rows, :list, required: true, doc: "queued task rows (form state)"
+  attr :tasks, :list, required: true, doc: "the config's existing tasks (for recommendations)"
+
+  @doc """
+  A list-style editor for queueing one or more new probe tasks for an agent.
+  Each row picks a task type + target/port/interval; submitting inserts them
+  and bumps the agent generation. Traceroute rows without a same-IP latency
+  probe surface a "recommended" ping/STAMP suggestion.
+  """
+  def task_form(assigns) do
+    assigns =
+      assign(assigns, :recommendations, Dashboard.recommended_trace_targets(assigns.rows, assigns.tasks))
+
+    ~H"""
+    <section class="card bg-base-100 border border-base-300">
+      <div class="card-body gap-4">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-base-content/70">
+            Add probe tasks
+          </h2>
+          <span :if={@rows != []} class="text-xs text-base-content/50">
+            saving inserts the tasks &amp; bumps the agent generation
+          </span>
+        </div>
+
+        <form id="add-tasks-form" phx-change="task_form_change" phx-submit="save_tasks" class="flex flex-col gap-2">
+          <p :if={@rows == []} class="text-sm text-base-content/60">
+            No tasks queued. Add one below to push new probes to this agent.
+          </p>
+
+          <div
+            :for={row <- @rows}
+            id={"task-#{row.ref}"}
+            class="flex flex-wrap items-center gap-2 rounded-lg border border-base-300 bg-base-200/40 px-3 py-2"
+          >
+            <select name={"tasks[#{row.ref}][type]"} class="select select-bordered select-sm w-40">
+              <option :for={{label, value} <- Dashboard.task_types()} value={value} selected={value == row.type}>
+                {label}
+              </option>
+            </select>
+
+            <span class="text-base-content/40">→</span>
+
+            <input
+              :if={Dashboard.task_has_target?(row.type)}
+              type="text"
+              name={"tasks[#{row.ref}][target]"}
+              value={row.target}
+              placeholder="target IP / host"
+              phx-debounce="300"
+              autocomplete="off"
+              class="input input-bordered input-sm w-48 font-mono"
+            />
+
+            <label
+              :if={Dashboard.task_has_port?(row.type)}
+              class="flex items-center gap-1 text-xs text-base-content/60"
+            >
+              {Dashboard.port_label(row.type)}
+              <input
+                type="number"
+                min="1"
+                max="65535"
+                name={"tasks[#{row.ref}][port]"}
+                value={row.port}
+                phx-debounce="300"
+                class="input input-bordered input-sm w-24"
+              />
+            </label>
+
+            <label
+              :if={Dashboard.task_schedulable?(row.type)}
+              class="flex items-center gap-1 text-xs text-base-content/60"
+            >
+              every
+              <input
+                type="number"
+                min="1"
+                name={"tasks[#{row.ref}][interval]"}
+                value={row.interval}
+                placeholder={Dashboard.default_interval(row.type)}
+                phx-debounce="300"
+                class="input input-bordered input-sm w-20"
+              />s
+            </label>
+            <span :if={not Dashboard.task_schedulable?(row.type)} class="text-xs text-base-content/50">
+              long-running listener
+            </span>
+
+            <button
+              type="button"
+              phx-click="remove_task_row"
+              phx-value-ref={row.ref}
+              class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/50 hover:text-error"
+              aria-label="Remove task"
+            >
+              <.icon name="hero-x-mark" class="size-4" />
+            </button>
+          </div>
+
+          <div
+            :for={target <- @recommendations}
+            class="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-warning/40 bg-warning/5 px-3 py-2 text-sm"
+          >
+            <.icon name="hero-light-bulb" class="size-4 text-warning shrink-0" />
+            <span>Traceroute to <span class="font-mono">{target}</span> has no latency probe.</span>
+            <span class="badge badge-warning badge-sm">Recommended</span>
+            <div class="ml-auto flex gap-1">
+              <button
+                type="button"
+                class="btn btn-xs btn-outline btn-warning"
+                phx-click="add_task_row"
+                phx-value-type="ping"
+                phx-value-target={target}
+              >
+                + Ping
+              </button>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline btn-warning"
+                phx-click="add_task_row"
+                phx-value-type="stamp-sender"
+                phx-value-target={target}
+              >
+                + STAMP
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <button type="button" phx-click="add_task_row" class="btn btn-sm btn-ghost gap-1">
+              <.icon name="hero-plus" class="size-4" /> Add task
+            </button>
+            <button type="submit" disabled={@rows == []} class="btn btn-sm btn-primary gap-1">
+              <.icon name="hero-check" class="size-4" />
+              {if @rows == [], do: "Save", else: "Save #{length(@rows)} task(s)"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+    """
+  end
 
   def short_uuid(nil), do: ""
   def short_uuid(uuid) when is_binary(uuid), do: String.slice(uuid, 0, 8) <> "…"

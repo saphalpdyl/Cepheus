@@ -175,8 +175,7 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.Pool, traceData *common.TraceData, payload *common.ReportPayload, serialId string, agentConfigId string) error {
-	var traceDataPayload common.TraceDataTracePayload
+func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.Pool, traceData *common.TraceData, payload *common.ReportPayload, serialId string, agentConfigId string) error { var traceDataPayload common.TraceDataTracePayload
 	if err := json.Unmarshal(traceData.Data, &traceDataPayload); err != nil {
 		s.logger.ErrorContext(ctx, "failed to unmarshal normal json-based traceroute data", log.Err(err))
 		return err
@@ -276,6 +275,8 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		return err
 	}
 
+	// Fingerprinting and adding ASN details
+	uniqueASNs := make([]int, 0, len(traceHops))
 	for i := range traceHops {
 		fetchedASN, ok := asnMap[*traceHops[i].Ip]
 		if !ok {
@@ -283,8 +284,32 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			continue
 		}
 
+		if len(uniqueASNs) == 0 || int(fetchedASN.Int32) != uniqueASNs[len(uniqueASNs)-1] {
+			if int(fetchedASN.Int32) != 0 {
+				uniqueASNs = append(uniqueASNs, int(fetchedASN.Int32))
+			}
+		}
+
 		traceHops[i].Asn = fetchedASN
 	}
+	
+	// Generate fingerprint
+	fingerprint := ""
+	for _, asn := range uniqueASNs {
+		fingerprint += fmt.Sprintf(":AS%d", asn)
+	}
+
+	// Upsert fingerprint into measurement
+	_, err = s.query.WithTx(tx).UpsertFingerprintHash(ctx, traceprocessor_db.UpsertFingerprintHashParams{
+		PathHash: fingerprint,	
+		ID:       measurement.ID,
+	})
+
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to upsert fingerprint hash", log.Err(err))
+		return err
+	}
+
 
 	for _, hop := range traceDataPayload.NoHops {
 		traceHops = append(traceHops, traceprocessor_db.InsertTraceHopParams{

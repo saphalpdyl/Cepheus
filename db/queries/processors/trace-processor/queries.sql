@@ -32,3 +32,9 @@ VALUES ($1, $2, $3, $4, $5);
 -- name: GetASNForIPs :many
 SELECT ip, asn FROM as_details
 WHERE ip = ANY(@ips::inet[]);
+
+-- name: UpsertFingerprintHash :one
+UPDATE trace_measurements
+SET path_hash = $1
+WHERE id = $2
+RETURNING path_hash;
