@@ -175,7 +175,9 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.Pool, traceData *common.TraceData, payload *common.ReportPayload, serialId string, agentConfigId string) error { var traceDataPayload common.TraceDataTracePayload
+func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.Pool, traceData *common.TraceData, payload *common.ReportPayload, serialId string, agentConfigId string) error { 
+
+	var traceDataPayload common.TraceDataTracePayload
 	if err := json.Unmarshal(traceData.Data, &traceDataPayload); err != nil {
 		s.logger.ErrorContext(ctx, "failed to unmarshal normal json-based traceroute data", log.Err(err))
 		return err
