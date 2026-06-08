@@ -95,7 +95,7 @@ type PingDataPayload struct {
 	NoResponses []any `json:"no_responses"`
 	Statistics  struct {
 		Replies int     `json:"replies"`
-		Loss    int     `json:"loss"`
+		Loss    float64 `json:"loss"`
 		Min     float64 `json:"min"`
 		Max     float64 `json:"max"`
 		Avg     float64 `json:"avg"`
