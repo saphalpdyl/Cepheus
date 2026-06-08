@@ -13,8 +13,9 @@ import (
 )
 
 const getASNForIPs = `-- name: GetASNForIPs :many
-SELECT ip, asn FROM as_details
-WHERE ip = ANY($1::inet[])
+SELECT ip, asn
+FROM as_details
+WHERE ip = ANY ($1::inet[])
 `
 
 type GetASNForIPsRow struct {
@@ -43,7 +44,9 @@ func (q *Queries) GetASNForIPs(ctx context.Context, ips []netip.Addr) ([]GetASNF
 }
 
 const getExistingIPs = `-- name: GetExistingIPs :many
-SELECT ip FROM as_details WHERE ip = ANY($1::inet[])
+SELECT ip
+FROM as_details
+WHERE ip = ANY ($1::inet[])
 `
 
 func (q *Queries) GetExistingIPs(ctx context.Context, ips []netip.Addr) ([]netip.Addr, error) {
@@ -67,7 +70,8 @@ func (q *Queries) GetExistingIPs(ctx context.Context, ips []netip.Addr) ([]netip
 }
 
 const getHopsByMeasurement = `-- name: GetHopsByMeasurement :many
-SELECT timestamp, measurement_id, ip, ttl, rtt, icmp_type, icmp_code, reply_ttl, asn, is_no_hop FROM trace_hops
+SELECT timestamp, measurement_id, ip, ttl, rtt, icmp_type, icmp_code, reply_ttl, asn, is_no_hop
+FROM trace_hops
 WHERE measurement_id = $1
 ORDER BY ttl ASC
 `
@@ -104,7 +108,8 @@ func (q *Queries) GetHopsByMeasurement(ctx context.Context, measurementID pgtype
 }
 
 const getMeasurementsByPath = `-- name: GetMeasurementsByPath :many
-SELECT id, serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw FROM trace_measurements
+SELECT id, serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, asn_path_hash, link_path_hash, raw
+FROM trace_measurements
 WHERE src = $1
   AND dst = $2
   AND timestamp > NOW() - $3::interval
@@ -137,7 +142,8 @@ func (q *Queries) GetMeasurementsByPath(ctx context.Context, arg GetMeasurements
 			&i.Method,
 			&i.StopReason,
 			&i.HopCount,
-			&i.PathHash,
+			&i.AsnPathHash,
+			&i.LinkPathHash,
 			&i.Raw,
 		); err != nil {
 			return nil, err
@@ -163,11 +169,24 @@ type InsertTraceHopParams struct {
 	IsNoHop       bool
 }
 
+type InsertTraceLinkParams struct {
+	Timestamp     pgtype.Timestamptz
+	MeasurementID pgtype.UUID
+	ProbeID       int32
+	SrcIp         *netip.Addr
+	DstIp         *netip.Addr
+	TtlGap        int32
+	DiffRtt       pgtype.Float8
+	IsSrcRespond  bool
+	IsDstRespond  bool
+}
+
 const insertTraceMeasurement = `-- name: InsertTraceMeasurement :one
 INSERT INTO trace_measurements
-(serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw
+(serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, asn_path_hash, link_path_hash,
+ raw)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, asn_path_hash, link_path_hash, raw
 `
 
 type InsertTraceMeasurementParams struct {
@@ -180,7 +199,8 @@ type InsertTraceMeasurementParams struct {
 	Method        string
 	StopReason    string
 	HopCount      int32
-	PathHash      string
+	AsnPathHash   string
+	LinkPathHash  string
 	Raw           []byte
 }
 
@@ -195,7 +215,8 @@ func (q *Queries) InsertTraceMeasurement(ctx context.Context, arg InsertTraceMea
 		arg.Method,
 		arg.StopReason,
 		arg.HopCount,
-		arg.PathHash,
+		arg.AsnPathHash,
+		arg.LinkPathHash,
 		arg.Raw,
 	)
 	var i TraceMeasurement
@@ -210,7 +231,8 @@ func (q *Queries) InsertTraceMeasurement(ctx context.Context, arg InsertTraceMea
 		&i.Method,
 		&i.StopReason,
 		&i.HopCount,
-		&i.PathHash,
+		&i.AsnPathHash,
+		&i.LinkPathHash,
 		&i.Raw,
 	)
 	return i, err
@@ -226,19 +248,26 @@ type UpsertAsDetailsParams struct {
 
 const upsertFingerprintHash = `-- name: UpsertFingerprintHash :one
 UPDATE trace_measurements
-SET path_hash = $1
-WHERE id = $2
-RETURNING path_hash
+SET asn_path_hash  = $1,
+    link_path_hash = $2
+WHERE id = $3
+RETURNING asn_path_hash, link_path_hash
 `
 
 type UpsertFingerprintHashParams struct {
-	PathHash string
-	ID       pgtype.UUID
+	AsnPathHash  string
+	LinkPathHash string
+	ID           pgtype.UUID
 }
 
-func (q *Queries) UpsertFingerprintHash(ctx context.Context, arg UpsertFingerprintHashParams) (string, error) {
-	row := q.db.QueryRow(ctx, upsertFingerprintHash, arg.PathHash, arg.ID)
-	var path_hash string
-	err := row.Scan(&path_hash)
-	return path_hash, err
+type UpsertFingerprintHashRow struct {
+	AsnPathHash  string
+	LinkPathHash string
+}
+
+func (q *Queries) UpsertFingerprintHash(ctx context.Context, arg UpsertFingerprintHashParams) (UpsertFingerprintHashRow, error) {
+	row := q.db.QueryRow(ctx, upsertFingerprintHash, arg.AsnPathHash, arg.LinkPathHash, arg.ID)
+	var i UpsertFingerprintHashRow
+	err := row.Scan(&i.AsnPathHash, &i.LinkPathHash)
+	return i, err
 }

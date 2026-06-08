@@ -1,28 +1,33 @@
 -- name: InsertTraceMeasurement :one
 INSERT INTO trace_measurements
-(serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, path_hash, raw)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+(serial_id, agent_config_id, timestamp, type, src, dst, method, stop_reason, hop_count, asn_path_hash, link_path_hash,
+ raw)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: InsertTraceHop :copyfrom
 INSERT INTO trace_hops
-    (timestamp, measurement_id, ip, ttl, rtt, icmp_type, icmp_code, reply_ttl, asn, is_no_hop)
+(timestamp, measurement_id, ip, ttl, rtt, icmp_type, icmp_code, reply_ttl, asn, is_no_hop)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
 -- name: GetMeasurementsByPath :many
-SELECT * FROM trace_measurements
+SELECT *
+FROM trace_measurements
 WHERE src = $1
   AND dst = $2
   AND timestamp > NOW() - $3::interval
 ORDER BY timestamp DESC;
 
 -- name: GetHopsByMeasurement :many
-SELECT * FROM trace_hops
+SELECT *
+FROM trace_hops
 WHERE measurement_id = $1
 ORDER BY ttl ASC;
 
 -- name: GetExistingIPs :many
-SELECT ip FROM as_details WHERE ip = ANY(@ips::inet[]);
+SELECT ip
+FROM as_details
+WHERE ip = ANY (@ips::inet[]);
 
 -- name: UpsertAsDetails :copyfrom
 INSERT INTO as_details
@@ -30,11 +35,18 @@ INSERT INTO as_details
 VALUES ($1, $2, $3, $4, $5);
 
 -- name: GetASNForIPs :many
-SELECT ip, asn FROM as_details
-WHERE ip = ANY(@ips::inet[]);
+SELECT ip, asn
+FROM as_details
+WHERE ip = ANY (@ips::inet[]);
 
 -- name: UpsertFingerprintHash :one
 UPDATE trace_measurements
-SET path_hash = $1
-WHERE id = $2
-RETURNING path_hash;
+SET asn_path_hash  = $1,
+    link_path_hash = $2
+WHERE id = $3
+RETURNING asn_path_hash, link_path_hash;
+
+-- name: InsertTraceLink :copyfrom
+INSERT INTO trace_links
+(timestamp, measurement_id, probe_id, src_ip, dst_ip, ttl_gap, diff_rtt, is_src_respond, is_dst_respond)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);

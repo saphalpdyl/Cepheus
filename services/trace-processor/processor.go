@@ -1,14 +1,20 @@
 package traceprocessor
+
 import (
-	"cepheus/libs/common"
-	processor_shared "cepheus/libs/common/pgx"
-	traceprocessor_db "cepheus/services/trace-processor/db"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/netip"
+	"sort"
+	"strings"
 	"time"
+
+	"cepheus/libs/common"
+	processor_shared "cepheus/libs/common/pgx"
+	traceprocessor_db "cepheus/services/trace-processor/db"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -95,7 +101,6 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 			DeliverPolicy: jetstream.DeliverNewPolicy,
 		},
 	)
-
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to create or update consumer", log.Err(err))
 		return err
@@ -152,7 +157,6 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 						msg.Nak()
 						continue
 					}
-
 				} else if traceData.Type == common.TraceProbeTypeTraceLb {
 					// TODO: Do this
 					s.logger.WarnContext(ctx, "json-based tracelb parser not implemented yet")
@@ -167,7 +171,6 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 				msg.Ack()
 			}
 		}
-
 	}()
 
 	<-ctx.Done()
@@ -175,8 +178,7 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.Pool, traceData *common.TraceData, payload *common.ReportPayload, serialId string, agentConfigId string) error { 
-
+func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.Pool, traceData *common.TraceData, payload *common.ReportPayload, serialId string, agentConfigId string) error {
 	var traceDataPayload common.TraceDataTracePayload
 	if err := json.Unmarshal(traceData.Data, &traceDataPayload); err != nil {
 		s.logger.ErrorContext(ctx, "failed to unmarshal normal json-based traceroute data", log.Err(err))
@@ -221,11 +223,11 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			Method:        string(traceData.Method),
 			StopReason:    traceDataPayload.StopReason,
 			HopCount:      int32(traceDataPayload.HopCount),
-			PathHash:      "",
+			AsnPathHash:   "",
+			LinkPathHash:  "",
 			Raw:           traceData.Data,
 		},
 	)
-
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to insert trace measurement", log.Err(err))
 		return err
@@ -294,24 +296,36 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 
 		traceHops[i].Asn = fetchedASN
 	}
-	
-	// Generate fingerprint
-	fingerprint := ""
+
+
+	// Generate fingerprints
+	asn_pairs := ""
 	for _, asn := range uniqueASNs {
-		fingerprint += fmt.Sprintf(":AS%d", asn)
+		asn_pairs += fmt.Sprintf(":AS%d", asn)
 	}
+	asn_fingerprint_hash := sha256.Sum256([]byte(asn_pairs))
+
+	// Generate link_fingerprint
+	links := extractLinks(traceDataPayload)
+	ip_pairs := make([]string, 0, len(links))
+	for _, l := range links {
+		if l.SrcIP != nil && l.DstIP != nil {
+			ip_pairs = append(ip_pairs, fmt.Sprintf("%s->%s", *l.SrcIP, *l.DstIP))
+		}
+	}
+	sort.Strings(ip_pairs)
+	link_fingerprint_hash := sha256.Sum256([]byte(strings.Join(ip_pairs, ",")))
 
 	// Upsert fingerprint into measurement
 	_, err = s.query.WithTx(tx).UpsertFingerprintHash(ctx, traceprocessor_db.UpsertFingerprintHashParams{
-		PathHash: fingerprint,	
-		ID:       measurement.ID,
+		AsnPathHash:  hex.EncodeToString(asn_fingerprint_hash[:8]),
+		LinkPathHash: hex.EncodeToString(link_fingerprint_hash[:8]),
+		ID:           measurement.ID,
 	})
-
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to upsert fingerprint hash", log.Err(err))
 		return err
 	}
-
 
 	for _, hop := range traceDataPayload.NoHops {
 		traceHops = append(traceHops, traceprocessor_db.InsertTraceHopParams{
@@ -327,9 +341,6 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			IsNoHop:       true,
 		})
 	}
-
-	// Extract Links
-	_ = extractLinks(traceDataPayload)
 
 	_, err = s.query.WithTx(tx).InsertTraceHop(ctx, traceHops)
 	if err != nil {
@@ -381,7 +392,6 @@ func (s *TraceProcessor) enrichMissingHops(ctx context.Context, allIPs []netip.A
 		s.logger.ErrorContext(ctx, "failed to lookup missing ips", log.Err(err))
 		return err
 	}
-
 
 	var asDetails []traceprocessor_db.UpsertAsDetailsParams
 

@@ -11,7 +11,8 @@ CREATE TABLE trace_measurements
     method          TEXT        NOT NULL,
     stop_reason     TEXT        NOT NULL,
     hop_count       INT         NOT NULL,
-    path_hash       TEXT        NOT NULL,
+    asn_path_hash   TEXT        NOT NULL,
+    link_path_hash  TEXT        NOT NULL,
     raw             JSONB       NOT NULL
 );
 
@@ -37,20 +38,21 @@ CREATE TABLE trace_hops
 SELECT create_hypertable('trace_hops', 'timestamp');
 CREATE INDEX ON trace_hops (ip, timestamp DESC);
 
-CREATE TABLE trace_links (
-  timestamp TIMESTAMPTZ NOT NULL,
-  measurement_id UUID NOT NULL REFERENCES trace_measurements (id) ON DELETE CASCADE,
+CREATE TABLE trace_links
+(
+    timestamp      TIMESTAMPTZ NOT NULL,
+    measurement_id UUID        NOT NULL REFERENCES trace_measurements (id) ON DELETE CASCADE,
 
-  probe_id INT NOT NULL,
+    probe_id       INT         NOT NULL,
 
-  src_ip INET NULL,
-  dst_ip INET NULL,
+    src_ip         INET        NULL,
+    dst_ip         INET        NULL,
 
-  ttl_gap INT NOT NULL,
-  diff_rtt FLOAT NULL,
+    ttl_gap        INT         NOT NULL,
+    diff_rtt       FLOAT       NULL,
 
-  is_src_respond BOOLEAN NOT NULL,
-  is_dst_respond BOOLEAN NOT NULL
+    is_src_respond BOOLEAN     NOT NULL,
+    is_dst_respond BOOLEAN     NOT NULL
 );
 
 SELECT create_hypertable('trace_links', 'timestamp');

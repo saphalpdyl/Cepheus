@@ -31,6 +31,18 @@ type TraceHop struct {
 	IsNoHop       bool
 }
 
+type TraceLink struct {
+	Timestamp     pgtype.Timestamptz
+	MeasurementID pgtype.UUID
+	ProbeID       int32
+	SrcIp         *netip.Addr
+	DstIp         *netip.Addr
+	TtlGap        int32
+	DiffRtt       pgtype.Float8
+	IsSrcRespond  bool
+	IsDstRespond  bool
+}
+
 type TraceMeasurement struct {
 	ID            pgtype.UUID
 	SerialID      string
@@ -42,6 +54,7 @@ type TraceMeasurement struct {
 	Method        string
 	StopReason    string
 	HopCount      int32
-	PathHash      string
+	AsnPathHash   string
+	LinkPathHash  string
 	Raw           []byte
 }

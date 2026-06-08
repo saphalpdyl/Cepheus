@@ -50,6 +50,46 @@ func (q *Queries) InsertTraceHop(ctx context.Context, arg []InsertTraceHopParams
 	return q.db.CopyFrom(ctx, []string{"trace_hops"}, []string{"timestamp", "measurement_id", "ip", "ttl", "rtt", "icmp_type", "icmp_code", "reply_ttl", "asn", "is_no_hop"}, &iteratorForInsertTraceHop{rows: arg})
 }
 
+// iteratorForInsertTraceLink implements pgx.CopyFromSource.
+type iteratorForInsertTraceLink struct {
+	rows                 []InsertTraceLinkParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForInsertTraceLink) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForInsertTraceLink) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].Timestamp,
+		r.rows[0].MeasurementID,
+		r.rows[0].ProbeID,
+		r.rows[0].SrcIp,
+		r.rows[0].DstIp,
+		r.rows[0].TtlGap,
+		r.rows[0].DiffRtt,
+		r.rows[0].IsSrcRespond,
+		r.rows[0].IsDstRespond,
+	}, nil
+}
+
+func (r iteratorForInsertTraceLink) Err() error {
+	return nil
+}
+
+func (q *Queries) InsertTraceLink(ctx context.Context, arg []InsertTraceLinkParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"trace_links"}, []string{"timestamp", "measurement_id", "probe_id", "src_ip", "dst_ip", "ttl_gap", "diff_rtt", "is_src_respond", "is_dst_respond"}, &iteratorForInsertTraceLink{rows: arg})
+}
+
 // iteratorForUpsertAsDetails implements pgx.CopyFromSource.
 type iteratorForUpsertAsDetails struct {
 	rows                 []UpsertAsDetailsParams
