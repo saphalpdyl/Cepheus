@@ -328,6 +328,9 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		})
 	}
 
+	// Extract Links
+	_ = extractLinks(traceDataPayload)
+
 	_, err = s.query.WithTx(tx).InsertTraceHop(ctx, traceHops)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to insert trace hops", log.Err(err))

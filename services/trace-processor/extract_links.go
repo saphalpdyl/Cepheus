@@ -19,8 +19,8 @@ type ParsedHop struct {
 
 type TraceLink struct {
 	ProbeID int
-	SrcIP   string
-	DstIP   string
+	SrcIP   *string
+	DstIP   *string
 	TTLGap  int
 
 	// For link to/from a Z node ( unresponsive hop )
@@ -63,6 +63,18 @@ func extractLinks(payload common.TraceDataTracePayload) []TraceLink {
 		groups[k] = hopsCopy
 	}
 
+	// Deduplication
+	for k, hops := range groups {
+		deduped := make([]ParsedHop, 0, len(hops))
+		for i, h := range hops {
+			if i == 0 || h.ProbeTTL != hops[i-1].ProbeTTL {
+				deduped = append(deduped, h)
+			}
+		}
+
+		groups[k] = deduped
+	}
+
 	seen := make(map[string]bool)
 	var links []TraceLink
 
@@ -75,8 +87,14 @@ func extractLinks(payload common.TraceDataTracePayload) []TraceLink {
 				TTLGap:       dst.ProbeTTL - src.ProbeTTL,
 				IsSrcRespond: !src.IsTimeout,
 				IsDstRespond: !dst.IsTimeout,
-				SrcIP:        src.Addr,
-				DstIP:        dst.Addr,
+			}
+
+			if !src.IsTimeout {
+				link.SrcIP = &src.Addr
+			} 
+
+			if !dst.IsTimeout {
+				link.DstIP = &dst.Addr;
 			}
 
 			if !src.IsTimeout && !dst.IsTimeout {

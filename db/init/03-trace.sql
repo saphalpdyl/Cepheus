@@ -36,3 +36,23 @@ CREATE TABLE trace_hops
 
 SELECT create_hypertable('trace_hops', 'timestamp');
 CREATE INDEX ON trace_hops (ip, timestamp DESC);
+
+CREATE TABLE trace_links (
+  timestamp TIMESTAMPTZ NOT NULL,
+  measurement_id UUID NOT NULL REFERENCES trace_measurements (id) ON DELETE CASCADE,
+
+  probe_id INT NOT NULL,
+
+  src_ip INET NULL,
+  dst_ip INET NULL,
+
+  ttl_gap INT NOT NULL,
+  diff_rtt FLOAT NULL,
+
+  is_src_respond BOOLEAN NOT NULL,
+  is_dst_respond BOOLEAN NOT NULL
+);
+
+SELECT create_hypertable('trace_links', 'timestamp');
+CREATE INDEX ON trace_links (src_ip, timestamp DESC);
+CREATE INDEX ON trace_links (dst_ip, timestamp DESC);
