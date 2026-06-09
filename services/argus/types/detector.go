@@ -13,9 +13,9 @@ type Finding struct {
 	Details  FindingDetails
 }
 
-type Sample struct {
+type Sample[T comparable] struct {
 	Timestamp time.Time
-	Value     float64
+	Value     T
 }
 
 // Finding details

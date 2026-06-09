@@ -31,7 +31,7 @@ func NewEmwa(config EwmaConfig) *Ewma {
 	return &Ewma{config: config}
 }
 
-func (e *Ewma) Step(_ context.Context, state *EwmaState, s types.Sample) *types.Finding {
+func (e *Ewma) Step(_ context.Context, state *EwmaState, s types.Sample[float64]) *types.Finding {
 	if state.N == 0 {
 		state.Mean = s.Value
 		state.Variance = 0.0
