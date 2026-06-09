@@ -348,10 +348,63 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		return err
 	}
 
+	// Convert 
+	dbLinks := make([]traceprocessor_db.InsertTraceLinkParams, 0, len(links))
+	for _, l := range links {
+		srcIP := (*netip.Addr)(nil)
+		if l.SrcIP != nil {
+			srcIPVal, err := netip.ParseAddr(*l.SrcIP)
+			srcIP = &srcIPVal
+			if err != nil {
+				s.logger.ErrorContext(ctx, "failed to parse link src ip", log.Err(err), "src_ip", *l.SrcIP)
+				return err
+			}
+		}
+
+		dstIP := (*netip.Addr)(nil)
+		if l.DstIP != nil {
+			dstIPVal, err := netip.ParseAddr(*l.DstIP)
+			dstIP = &dstIPVal
+			if err != nil {
+				s.logger.ErrorContext(ctx, "failed to parse link dst ip", log.Err(err), "dst_ip", *l.DstIP)
+				return err
+			}
+		}
+
+
+		diffRttValue := 0.0
+		if l.DiffRTT != nil {
+			diffRttValue = *l.DiffRTT
+		}
+
+		dbLinks = append(dbLinks, traceprocessor_db.InsertTraceLinkParams{
+			Timestamp:     pgtype.Timestamptz{Time: payload.Payload.Timestamp, Valid: true},
+			MeasurementID: measurement.ID,
+			ProbeID:       int32(l.ProbeID),
+			SrcIp:         srcIP,
+			DstIp:         dstIP,
+			TtlGap:        int32(l.TTLGap),
+			DiffRtt:       pgtype.Float8{
+				Float64: diffRttValue,
+				Valid:  l.DiffRTT != nil,
+			},
+			IsSrcRespond:  l.IsSrcRespond,
+			IsDstRespond:  l.IsDstRespond,
+		})	
+	}
+
+	_, err = s.query.WithTx(tx).InsertTraceLink(ctx, dbLinks)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to insert trace links", log.Err(err))
+		return err
+	}
+
 	if err = tx.Commit(ctx); err != nil {
 		s.logger.ErrorContext(ctx, "failed to commit transaction", log.Err(err))
 		return err
 	}
+
+	s.logger.InfoContext(ctx, "successfully processed trace measurement", "measurement_id", measurement.ID)
 
 	return nil
 }
