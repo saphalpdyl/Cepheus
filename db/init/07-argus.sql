@@ -1,15 +1,18 @@
 CREATE TABLE IF NOT EXISTS argus_baselines
 (
+    -- These make up the unique key for a baseline, and are used to link findings to baselines
     serial_id  TEXT        NOT NULL,
+    src_ip     TEXT        NOT NULL,
     target     TEXT        NOT NULL,
     port       INTEGER     NOT NULL,
     metric     TEXT        NOT NULL,
     detector   TEXT        NOT NULL,
+
     state      JSONB       NOT NULL,
     n          BIGINT      NOT NULL DEFAULT 0,
     last_seen  TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (serial_id, target, port, metric, detector)
+    PRIMARY KEY (serial_id, src_ip, target, port, metric, detector)
 );
 
 CREATE TABLE IF NOT EXISTS argus_events
@@ -54,10 +57,11 @@ CREATE UNIQUE INDEX ON argus_findings (serial_id, target, port, metric, detector
 CREATE TABLE IF NOT EXISTS argus_policy_state
 (
     serial_id         TEXT             NOT NULL,
+    src_ip TEXT NOT NULL,
     target            TEXT             NOT NULL,
     port              INTEGER          NOT NULL,
     metric            TEXT             NOT NULL,
-    detector          TEXT             NOT NULL, 
+    detector          TEXT             NOT NULL,
     status            TEXT             NOT NULL,
     score             DOUBLE PRECISION NOT NULL,
     score_updated_at  TIMESTAMPTZ      NOT NULL,
@@ -65,5 +69,5 @@ CREATE TABLE IF NOT EXISTS argus_policy_state
     pending_findings  UUID[]           NOT NULL DEFAULT '{}',
     entered_status_at TIMESTAMPTZ      NOT NULL,
     updated_at        TIMESTAMPTZ      NOT NULL DEFAULT now(),
-    PRIMARY KEY (serial_id, target, port, metric, detector)
+    PRIMARY KEY (serial_id, src_ip, target, port, metric, detector)
 );

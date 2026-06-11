@@ -2,6 +2,15 @@ package types
 
 import "time"
 
+type DetectorType string
+
+const (
+	DetectorTypeEwma  DetectorType = "EWMA"
+	DetectorTypeFreq  DetectorType = "FREQ"
+	DetectorTypeBetaB DetectorType = "BETA"
+	DetectorTypeMdmt  DetectorType = "MDMT"
+)
+
 type FindingDetails interface {
 	DetectorName() string
 }
@@ -18,7 +27,7 @@ type Sample[T comparable] struct {
 	Value     T
 }
 
-// Finding details
+// EwmaFindingDetails  details
 type EwmaFindingDetails struct {
 	Z        float64
 	Stddev   float64

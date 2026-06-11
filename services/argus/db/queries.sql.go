@@ -7,6 +7,7 @@ package argus_db
 
 import (
 	"context"
+	"net/netip"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -44,6 +45,53 @@ func (q *Queries) CloseEvent(ctx context.Context, arg CloseEventParams) error {
 	return err
 }
 
+const fetchPingSamples = `-- name: FetchPingSamples :many
+SELECT timestamp, loss, rtt_p95_ns
+FROM ping_measurements
+WHERE serial_id = $1
+  AND target = $2
+  AND timestamp > $3
+  AND timestamp <= $4
+`
+
+type FetchPingSamplesParams struct {
+	SerialID string
+	Target   string
+	After    pgtype.Timestamptz
+	Before   pgtype.Timestamptz
+}
+
+type FetchPingSamplesRow struct {
+	Timestamp pgtype.Timestamptz
+	Loss      float64
+	RttP95Ns  int64
+}
+
+func (q *Queries) FetchPingSamples(ctx context.Context, arg FetchPingSamplesParams) ([]FetchPingSamplesRow, error) {
+	rows, err := q.db.Query(ctx, fetchPingSamples,
+		arg.SerialID,
+		arg.Target,
+		arg.After,
+		arg.Before,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FetchPingSamplesRow
+	for rows.Next() {
+		var i FetchPingSamplesRow
+		if err := rows.Scan(&i.Timestamp, &i.Loss, &i.RttP95Ns); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const fetchStampSamples = `-- name: FetchStampSamples :many
 SELECT timestamp, loss, rtt_p95_ns, fwd_p95_ns, bwd_p95_ns
 FROM stamp_measurements
@@ -52,7 +100,6 @@ WHERE serial_id = $1
   AND port = $3
   AND timestamp > $4
   AND timestamp <= $5
-ORDER BY timestamp ASC
 `
 
 type FetchStampSamplesParams struct {
@@ -103,6 +150,53 @@ func (q *Queries) FetchStampSamples(ctx context.Context, arg FetchStampSamplesPa
 	return items, nil
 }
 
+const fetchTraceSamples = `-- name: FetchTraceSamples :many
+SELECT timestamp, asn_path_hash, link_path_hash
+FROM trace_measurements
+WHERE serial_id = $1
+  AND src = $2
+  AND dst = $3
+  AND type = $4
+`
+
+type FetchTraceSamplesParams struct {
+	SerialID string
+	Src      netip.Addr
+	Dst      netip.Addr
+	Type     string
+}
+
+type FetchTraceSamplesRow struct {
+	Timestamp    pgtype.Timestamptz
+	AsnPathHash  string
+	LinkPathHash string
+}
+
+func (q *Queries) FetchTraceSamples(ctx context.Context, arg FetchTraceSamplesParams) ([]FetchTraceSamplesRow, error) {
+	rows, err := q.db.Query(ctx, fetchTraceSamples,
+		arg.SerialID,
+		arg.Src,
+		arg.Dst,
+		arg.Type,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FetchTraceSamplesRow
+	for rows.Next() {
+		var i FetchTraceSamplesRow
+		if err := rows.Scan(&i.Timestamp, &i.AsnPathHash, &i.LinkPathHash); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getBaseline = `-- name: GetBaseline :one
 SELECT state, n, last_seen
 FROM argus_baselines
@@ -111,6 +205,7 @@ WHERE serial_id = $1
   AND port = $3
   AND metric = $4
   AND detector = $5
+  AND src_ip = $6
 `
 
 type GetBaselineParams struct {
@@ -119,6 +214,7 @@ type GetBaselineParams struct {
 	Port     int32
 	Metric   string
 	Detector string
+	SrcIp    string
 }
 
 type GetBaselineRow struct {
@@ -134,6 +230,7 @@ func (q *Queries) GetBaseline(ctx context.Context, arg GetBaselineParams) (GetBa
 		arg.Port,
 		arg.Metric,
 		arg.Detector,
+		arg.SrcIp,
 	)
 	var i GetBaselineRow
 	err := row.Scan(&i.State, &i.N, &i.LastSeen)
@@ -141,9 +238,17 @@ func (q *Queries) GetBaseline(ctx context.Context, arg GetBaselineParams) (GetBa
 }
 
 const getPolicyState = `-- name: GetPolicyState :one
-SELECT serial_id, target, port, metric, detector,
-       status, score, score_updated_at,
-       open_event_id, pending_findings, entered_status_at
+SELECT serial_id,
+       target,
+       port,
+       metric,
+       detector,
+       status,
+       score,
+       score_updated_at,
+       open_event_id,
+       pending_findings,
+       entered_status_at
 FROM argus_policy_state
 WHERE serial_id = $1
   AND target = $2
@@ -201,7 +306,7 @@ func (q *Queries) GetPolicyState(ctx context.Context, arg GetPolicyStateParams) 
 
 const insertFinding = `-- name: InsertFinding :one
 INSERT INTO argus_findings
-    (serial_id, target, port, metric, detector, ts, value, severity, details)
+(serial_id, target, port, metric, detector, ts, value, severity, details)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (serial_id, target, port, metric, detector, ts) DO NOTHING
 RETURNING id
@@ -236,27 +341,58 @@ func (q *Queries) InsertFinding(ctx context.Context, arg InsertFindingParams) (p
 	return id, err
 }
 
-const listActiveSeries = `-- name: ListActiveSeries :many
+const listActivePingSeries = `-- name: ListActivePingSeries :many
+SELECT DISTINCT serial_id, target
+FROM ping_measurements
+WHERE timestamp >= $1
+`
+
+type ListActivePingSeriesRow struct {
+	SerialID string
+	Target   string
+}
+
+func (q *Queries) ListActivePingSeries(ctx context.Context, timestamp pgtype.Timestamptz) ([]ListActivePingSeriesRow, error) {
+	rows, err := q.db.Query(ctx, listActivePingSeries, timestamp)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActivePingSeriesRow
+	for rows.Next() {
+		var i ListActivePingSeriesRow
+		if err := rows.Scan(&i.SerialID, &i.Target); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listActiveStampSeries = `-- name: ListActiveStampSeries :many
 SELECT DISTINCT serial_id, target, port
 FROM stamp_measurements
 WHERE timestamp >= $1
 `
 
-type ListActiveSeriesRow struct {
+type ListActiveStampSeriesRow struct {
 	SerialID string
 	Target   string
 	Port     int32
 }
 
-func (q *Queries) ListActiveSeries(ctx context.Context, timestamp pgtype.Timestamptz) ([]ListActiveSeriesRow, error) {
-	rows, err := q.db.Query(ctx, listActiveSeries, timestamp)
+func (q *Queries) ListActiveStampSeries(ctx context.Context, timestamp pgtype.Timestamptz) ([]ListActiveStampSeriesRow, error) {
+	rows, err := q.db.Query(ctx, listActiveStampSeries, timestamp)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListActiveSeriesRow
+	var items []ListActiveStampSeriesRow
 	for rows.Next() {
-		var i ListActiveSeriesRow
+		var i ListActiveStampSeriesRow
 		if err := rows.Scan(&i.SerialID, &i.Target, &i.Port); err != nil {
 			return nil, err
 		}
@@ -268,10 +404,56 @@ func (q *Queries) ListActiveSeries(ctx context.Context, timestamp pgtype.Timesta
 	return items, nil
 }
 
+const listActiveTraceSeries = `-- name: ListActiveTraceSeries :many
+SELECT DISTINCT serial_id, src, dst, method
+FROM trace_measurements
+WHERE timestamp >= $1
+`
+
+type ListActiveTraceSeriesRow struct {
+	SerialID string
+	Src      netip.Addr
+	Dst      netip.Addr
+	Method   string
+}
+
+func (q *Queries) ListActiveTraceSeries(ctx context.Context, timestamp pgtype.Timestamptz) ([]ListActiveTraceSeriesRow, error) {
+	rows, err := q.db.Query(ctx, listActiveTraceSeries, timestamp)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveTraceSeriesRow
+	for rows.Next() {
+		var i ListActiveTraceSeriesRow
+		if err := rows.Scan(
+			&i.SerialID,
+			&i.Src,
+			&i.Dst,
+			&i.Method,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNonCleanPolicyStates = `-- name: ListNonCleanPolicyStates :many
-SELECT serial_id, target, port, metric, detector,
-       status, score, score_updated_at,
-       open_event_id, pending_findings, entered_status_at
+SELECT serial_id,
+       target,
+       port,
+       metric,
+       detector,
+       status,
+       score,
+       score_updated_at,
+       open_event_id,
+       pending_findings,
+       entered_status_at
 FROM argus_policy_state
 WHERE status <> 'clean'
 `
@@ -324,8 +506,8 @@ func (q *Queries) ListNonCleanPolicyStates(ctx context.Context) ([]ListNonCleanP
 
 const openEvent = `-- name: OpenEvent :one
 INSERT INTO argus_events
-    (serial_id, target, port, metric, status, opened_at, last_seen_at,
-     finding_count, peak_severity, detectors)
+(serial_id, target, port, metric, status, opened_at, last_seen_at,
+ finding_count, peak_severity, detectors)
 VALUES ($1, $2, $3, $4, 'open', $5, $5, $6, $7, $8)
 RETURNING id
 `
@@ -363,8 +545,8 @@ SET last_seen_at  = $2,
     finding_count = finding_count + 1,
     peak_severity = GREATEST(peak_severity, $3),
     detectors     = CASE
-                    WHEN $4::TEXT = ANY (detectors) THEN detectors
-                    ELSE array_append(detectors, $4::TEXT)
+                        WHEN $4::TEXT = ANY (detectors) THEN detectors
+                        ELSE array_append(detectors, $4::TEXT)
         END
 WHERE id = $1
 `
@@ -388,17 +570,17 @@ func (q *Queries) UpdateEventOnFinding(ctx context.Context, arg UpdateEventOnFin
 
 const upsertBaseline = `-- name: UpsertBaseline :exec
 INSERT INTO argus_baselines
-    (serial_id, target, port, metric, detector, state, n, last_seen, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
-ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET
-    state      = EXCLUDED.state,
-    n          = EXCLUDED.n,
-    last_seen  = EXCLUDED.last_seen,
-    updated_at = now()
+(serial_id, src_ip, target, port, metric, detector, state, n, last_seen, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+ON CONFLICT (serial_id, src_ip, target, port, metric, detector) DO UPDATE SET state      = EXCLUDED.state,
+                                                                              n          = EXCLUDED.n,
+                                                                              last_seen  = EXCLUDED.last_seen,
+                                                                              updated_at = now()
 `
 
 type UpsertBaselineParams struct {
 	SerialID string
+	SrcIp    string
 	Target   string
 	Port     int32
 	Metric   string
@@ -411,6 +593,7 @@ type UpsertBaselineParams struct {
 func (q *Queries) UpsertBaseline(ctx context.Context, arg UpsertBaselineParams) error {
 	_, err := q.db.Exec(ctx, upsertBaseline,
 		arg.SerialID,
+		arg.SrcIp,
 		arg.Target,
 		arg.Port,
 		arg.Metric,
@@ -424,18 +607,17 @@ func (q *Queries) UpsertBaseline(ctx context.Context, arg UpsertBaselineParams) 
 
 const upsertPolicyState = `-- name: UpsertPolicyState :exec
 INSERT INTO argus_policy_state
-    (serial_id, target, port, metric, detector,
-     status, score, score_updated_at,
-     open_event_id, pending_findings, entered_status_at, updated_at)
+(serial_id, target, port, metric, detector,
+ status, score, score_updated_at,
+ open_event_id, pending_findings, entered_status_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
-ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET
-    status            = EXCLUDED.status,
-    score             = EXCLUDED.score,
-    score_updated_at  = EXCLUDED.score_updated_at,
-    open_event_id     = EXCLUDED.open_event_id,
-    pending_findings  = EXCLUDED.pending_findings,
-    entered_status_at = EXCLUDED.entered_status_at,
-    updated_at        = now()
+ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET status            = EXCLUDED.status,
+                                                                      score             = EXCLUDED.score,
+                                                                      score_updated_at  = EXCLUDED.score_updated_at,
+                                                                      open_event_id     = EXCLUDED.open_event_id,
+                                                                      pending_findings  = EXCLUDED.pending_findings,
+                                                                      entered_status_at = EXCLUDED.entered_status_at,
+                                                                      updated_at        = now()
 `
 
 type UpsertPolicyStateParams struct {
