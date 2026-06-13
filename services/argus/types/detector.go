@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type DetectorType string
 
@@ -22,7 +25,7 @@ type Finding struct {
 	Details  FindingDetails
 }
 
-type Sample[T comparable] struct {
+type Sample[T any] struct {
 	Timestamp time.Time
 	Value     T
 }
@@ -35,4 +38,15 @@ type EwmaFindingDetails struct {
 	N        int64
 }
 
-func (e *EwmaFindingDetails) DetectorName() string { return "ewma" }
+func (e *EwmaFindingDetails) DetectorName() string { return string(DetectorTypeEwma) }
+
+// Detector is the one interface the worker talks to. It is deliberately not
+// generic: the worker hands over the prior baseline state and an opaque value,
+// and each detector asserts the concrete type it expects on line one. That
+// single assertion is what lets the same loop drive float64, string, or (later)
+// object-valued samples without any type machinery leaking into the pipeline.
+type Detector interface {
+	// Step folds one sample into the baseline. It returns the new state to
+	// persist and a finding if the sample tripped the detector.
+	Step(state json.RawMessage, ts time.Time, value any) (json.RawMessage, *Finding, error)
+}

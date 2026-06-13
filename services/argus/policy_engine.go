@@ -133,7 +133,7 @@ func (p *PolicyEngine) Sweep(ctx context.Context) error {
 			Target:   pRaw.Target,
 			Port:     pRaw.Port,
 			Metric:   pRaw.Metric,
-			Detector: pRaw.Detector,
+			Detector: types.DetectorType(pRaw.Detector),
 		}
 
 		_, ok := p.states[seriesKey]
@@ -231,7 +231,7 @@ func (p *PolicyEngine) InsertFinding(ctx context.Context, seriesKey types.Series
 		Target:   seriesKey.Target,
 		Port:     seriesKey.Port,
 		Metric:   seriesKey.Metric,
-		Detector: seriesKey.Detector,
+		Detector: string(seriesKey.Detector),
 		Ts: pgtype.Timestamptz{
 			Time:  finding.TS,
 			Valid: true,
@@ -266,7 +266,7 @@ func (p *PolicyEngine) ApplyFinding(ctx context.Context, seriesKey types.SeriesK
 			Target:   seriesKey.Target,
 			Port:     seriesKey.Port,
 			Metric:   seriesKey.Metric,
-			Detector: seriesKey.Detector,
+			Detector: string(seriesKey.Detector),
 		})
 
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -479,7 +479,7 @@ func (p *PolicyEngine) savePolicyState(ctx context.Context, seriesKey types.Seri
 		Target:   seriesKey.Target,
 		Port:     seriesKey.Port,
 		Metric:   seriesKey.Metric,
-		Detector: seriesKey.Detector,
+		Detector: string(seriesKey.Detector),
 		Status:   string(state.Status),
 		Score:    state.BucketState.Score,
 		ScoreUpdatedAt: pgtype.Timestamptz{

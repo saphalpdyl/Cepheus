@@ -36,7 +36,7 @@ func CreateDefaultRegistry() *PipelineRegistry {
 				MetricName: "fwd_p95_ns",
 				Extract: func(data any) (any, error) {
 					row := data.(argus_db.FetchStampSamplesRow)
-					return row.FwdP95Ns, nil
+					return float64(row.FwdP95Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
@@ -44,7 +44,7 @@ func CreateDefaultRegistry() *PipelineRegistry {
 				MetricName: "bwd_p95_ns",
 				Extract: func(data any) (any, error) {
 					row := data.(argus_db.FetchStampSamplesRow)
-					return row.BwdP95Ns, nil
+					return float64(row.BwdP95Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
@@ -52,7 +52,7 @@ func CreateDefaultRegistry() *PipelineRegistry {
 				MetricName: "rtt_p95_ns",
 				Extract: func(data any) (any, error) {
 					row := data.(argus_db.FetchStampSamplesRow)
-					return row.RttP95Ns, nil
+					return float64(row.RttP95Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
