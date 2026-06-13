@@ -296,4 +296,58 @@ defmodule CepheusWeb.DashboardHTML do
   def trunc_details(nil), do: ""
   def trunc_details(s) when is_binary(s) and byte_size(s) > 80, do: binary_part(s, 0, 80) <> "…"
   def trunc_details(s) when is_binary(s), do: s
+
+  @doc """
+  Collapses a flat, ts-descending list of findings into one collapsible group
+  per `{target, port, metric, detector}` stream, so a burst of findings renders
+  as a handful of expandable rows instead of flooding the table.
+
+  Relies on the caller's `ORDER BY ts DESC` to keep both the group order
+  (most-recent stream first) and each group's `findings` newest-first, so no
+  timestamp re-sorting is needed. `expanded` is the `MapSet` of currently-open
+  group keys; each returned group carries its own `:expanded` flag and a stable
+  string `:key` for the toggle event.
+  """
+  def group_findings(findings, expanded) do
+    {order, groups} =
+      Enum.reduce(findings, {[], %{}}, fn f, {order, groups} ->
+        key = {f.target, f.port, f.metric, f.detector}
+
+        case groups do
+          %{^key => acc} -> {order, %{groups | key => [f | acc]}}
+          _ -> {[key | order], Map.put(groups, key, [f])}
+        end
+      end)
+
+    order
+    |> Enum.reverse()
+    |> Enum.map(fn {target, port, metric, detector} = key ->
+      fs = Enum.reverse(groups[key])
+      latest = hd(fs)
+      key_string = finding_group_key(target, port, metric, detector)
+
+      %{
+        key: key_string,
+        expanded: MapSet.member?(expanded, key_string),
+        target: target,
+        port: port,
+        metric: metric,
+        detector: detector,
+        count: length(fs),
+        latest_ts: latest.ts,
+        peak_severity: peak_finding_severity(fs),
+        findings: fs
+      }
+    end)
+  end
+
+  defp finding_group_key(target, port, metric, detector),
+    do: Enum.join([target, port, metric, detector], "|")
+
+  defp peak_finding_severity(findings) do
+    case findings |> Enum.map(& &1.severity) |> Enum.filter(&is_float/1) do
+      [] -> nil
+      severities -> Enum.max(severities)
+    end
+  end
 end

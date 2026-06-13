@@ -343,33 +343,65 @@
       <table class="table table-sm">
         <thead>
           <tr>
-            <th>ts</th>
+            <th class="w-6"></th>
             <th>target</th>
             <th>metric</th>
             <th>detector</th>
-            <th class="text-right">value</th>
-            <th class="text-right">severity</th>
-            <th>details</th>
-            <th>event</th>
+            <th class="text-right">count</th>
+            <th>latest</th>
+            <th class="text-right">peak severity</th>
           </tr>
         </thead>
-        <tbody>
-          <tr :for={f <- @findings}>
-            <td class="text-xs whitespace-nowrap">{fmt_dt(f.ts)}</td>
-            <td class="font-mono">{f.target}<span class="text-base-content/50">:{f.port}</span></td>
-            <td><span class="badge badge-sm badge-ghost font-mono">{f.metric}</span></td>
-            <td class="font-mono text-xs">{f.detector}</td>
-            <td class="text-right tabular-nums">{f.value}</td>
+        <tbody :for={g <- group_findings(@findings, @expanded_findings)}>
+          <tr phx-click="toggle_finding_group" phx-value-key={g.key} class="cursor-pointer hover">
+            <td>
+              <.icon
+                name="hero-chevron-right"
+                class={["size-4 text-base-content/50 transition-transform", g.expanded && "rotate-90"]}
+              />
+            </td>
+            <td class="font-mono">{g.target}<span class="text-base-content/50">:{g.port}</span></td>
+            <td><span class="badge badge-sm badge-ghost font-mono">{g.metric}</span></td>
+            <td class="font-mono text-xs">{g.detector}</td>
+            <td class="text-right tabular-nums">{g.count}</td>
+            <td class="text-xs whitespace-nowrap">{fmt_dt(g.latest_ts)}</td>
             <td class="text-right">
-              <span class={["badge badge-sm tabular-nums", severity_badge_class(f.severity)]}>
-                {fmt_severity(f.severity)}
+              <span class={["badge badge-sm tabular-nums", severity_badge_class(g.peak_severity)]}>
+                {fmt_severity(g.peak_severity)}
               </span>
             </td>
-            <td class="font-mono text-xs text-base-content/70" title={f.details}>
-              {trunc_details(f.details)}
-            </td>
-            <td class="font-mono text-xs text-base-content/60">
-              {if f.event_id, do: short_uuid(f.event_id), else: "—"}
+          </tr>
+          <tr :if={g.expanded} class="bg-base-200/30">
+            <td></td>
+            <td colspan="6" class="p-0">
+              <table class="table table-xs">
+                <thead>
+                  <tr>
+                    <th>ts</th>
+                    <th class="text-right">value</th>
+                    <th class="text-right">severity</th>
+                    <th>details</th>
+                    <th>event</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr :for={f <- g.findings}>
+                    <td class="text-xs whitespace-nowrap">{fmt_dt(f.ts)}</td>
+                    <td class="text-right tabular-nums">{f.value}</td>
+                    <td class="text-right">
+                      <span class={["badge badge-sm tabular-nums", severity_badge_class(f.severity)]}>
+                        {fmt_severity(f.severity)}
+                      </span>
+                    </td>
+                    <td class="font-mono text-xs text-base-content/70" title={f.details}>
+                      {trunc_details(f.details)}
+                    </td>
+                    <td class="font-mono text-xs text-base-content/60">
+                      {if f.event_id, do: short_uuid(f.event_id), else: "—"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </td>
           </tr>
         </tbody>

@@ -18,6 +18,7 @@ defmodule CepheusWeb.DashboardLive do
       |> assign(:open_event_counts, %{})
       |> assign(:events, [])
       |> assign(:findings, [])
+      |> assign(:expanded_findings, MapSet.new())
       |> assign(:stamp_targets, [])
       |> assign(:ping_targets, [])
       |> assign(:selected_stamp_targets, nil)
@@ -105,6 +106,17 @@ defmodule CepheusWeb.DashboardLive do
       |> load_show()
 
     {:noreply, socket}
+  end
+
+  def handle_event("toggle_finding_group", %{"key" => key}, socket) do
+    expanded = socket.assigns.expanded_findings
+
+    expanded =
+      if MapSet.member?(expanded, key),
+        do: MapSet.delete(expanded, key),
+        else: MapSet.put(expanded, key)
+
+    {:noreply, assign(socket, :expanded_findings, expanded)}
   end
 
   # ----- Task editor -----
