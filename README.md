@@ -20,7 +20,7 @@ Given the spec-driven design that will be implementated once the API and require
 
 Below is the draft architecture diagram for cepheus platform as a whole.
 
-![architecture diagram](/docs/images/arch.png)
+![architecture diagram](/docs/images/arch.svg)
 
 ### Contributions
 Although the development environment is developer-friendly and reproducible, the project lacks proper documentations for its architecture and design choices to be considered welcoming to contributors.
