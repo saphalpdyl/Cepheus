@@ -255,6 +255,7 @@ WHERE serial_id = $1
   AND port = $3
   AND metric = $4
   AND detector = $5
+  AND src_ip = $6
 `
 
 type GetPolicyStateParams struct {
@@ -263,6 +264,7 @@ type GetPolicyStateParams struct {
 	Port     int32
 	Metric   string
 	Detector string
+	SrcIp    string
 }
 
 type GetPolicyStateRow struct {
@@ -286,6 +288,7 @@ func (q *Queries) GetPolicyState(ctx context.Context, arg GetPolicyStateParams) 
 		arg.Port,
 		arg.Metric,
 		arg.Detector,
+		arg.SrcIp,
 	)
 	var i GetPolicyStateRow
 	err := row.Scan(
@@ -607,11 +610,11 @@ func (q *Queries) UpsertBaseline(ctx context.Context, arg UpsertBaselineParams) 
 
 const upsertPolicyState = `-- name: UpsertPolicyState :exec
 INSERT INTO argus_policy_state
-(serial_id, target, port, metric, detector,
+(serial_id, src_ip, target, port, metric, detector,
  status, score, score_updated_at,
  open_event_id, pending_findings, entered_status_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
-ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET status            = EXCLUDED.status,
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())
+ON CONFLICT (serial_id, src_ip, target, port, metric, detector) DO UPDATE SET status            = EXCLUDED.status,
                                                                       score             = EXCLUDED.score,
                                                                       score_updated_at  = EXCLUDED.score_updated_at,
                                                                       open_event_id     = EXCLUDED.open_event_id,
@@ -622,6 +625,7 @@ ON CONFLICT (serial_id, target, port, metric, detector) DO UPDATE SET status    
 
 type UpsertPolicyStateParams struct {
 	SerialID        string
+	SrcIp           string
 	Target          string
 	Port            int32
 	Metric          string
@@ -637,6 +641,7 @@ type UpsertPolicyStateParams struct {
 func (q *Queries) UpsertPolicyState(ctx context.Context, arg UpsertPolicyStateParams) error {
 	_, err := q.db.Exec(ctx, upsertPolicyState,
 		arg.SerialID,
+		arg.SrcIp,
 		arg.Target,
 		arg.Port,
 		arg.Metric,

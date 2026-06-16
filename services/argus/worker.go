@@ -22,10 +22,9 @@ type DiscoveredSeries struct {
 	Type     types.SeriesType
 	SerialId string
 	Target   string
-	Port     int32 // present only in STAMP
-	Src string // present only in TRACE
+	Port     int32  // present only in STAMP
+	Src      string // present only in TRACE
 }
-
 
 // RawSample is one fetched measurement row with its timestamp lifted out.
 // Row stays opaque; the per-metric Extractor knows how to read it.
@@ -205,6 +204,8 @@ func (w *Worker) fetch(ctx context.Context, series DiscoveredSeries, after time.
 		rows, err := w.query.FetchPingSamples(ctx, argus_db.FetchPingSamplesParams{
 			SerialID: series.SerialId,
 			Target:   series.Target,
+			After:    pgtype.Timestamptz{Time: after, Valid: true},
+			Before:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		})
 		if err != nil {
 			return nil, err
@@ -214,12 +215,13 @@ func (w *Worker) fetch(ctx context.Context, series DiscoveredSeries, after time.
 		for i, r := range rows {
 			out[i] = RawSample{TS: r.Timestamp.Time, Row: r}
 		}
+		return out, nil
 	case types.SeriesTypeTrace:
 		dst_ip, err := netip.ParseAddr(series.Target)
 		if err != nil {
 			return nil, fmt.Errorf("invalid target IP: %w", err)
 		}
-		
+
 		// Verify that the Src is not a zero value
 		if series.Src == "" {
 			return nil, fmt.Errorf("source IP is empty: required for TRACE series")
@@ -232,9 +234,9 @@ func (w *Worker) fetch(ctx context.Context, series DiscoveredSeries, after time.
 
 		rows, err := w.query.FetchTraceSamples(ctx, argus_db.FetchTraceSamplesParams{
 			SerialID: series.SerialId,
-			Dst: dst_ip,
-			Src: src_ip,
-			Type: "trace",
+			Dst:      dst_ip,
+			Src:      src_ip,
+			Type:     "trace",
 		})
 
 		if err != nil {
@@ -250,8 +252,6 @@ func (w *Worker) fetch(ctx context.Context, series DiscoveredSeries, after time.
 	default:
 		return nil, fmt.Errorf("no fetcher for series type %q", series.Type)
 	}
-
-	return nil, nil
 }
 
 // fold runs every sample newer than the monitor's cursor through its detector,

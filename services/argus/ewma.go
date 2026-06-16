@@ -64,6 +64,8 @@ func (e *Ewma) step(state *EwmaState, ts time.Time, value float64) *types.Findin
 		state.Variance = 0.0
 		state.N = 1
 		state.LastSeen = ts
+
+		return nil
 	}
 
 	stddev := math.Sqrt(state.Variance + e.config.Epsilon)
@@ -74,7 +76,7 @@ func (e *Ewma) step(state *EwmaState, ts time.Time, value float64) *types.Findin
 		finding = &types.Finding{
 			TS:       ts,
 			Value:    value,
-			Severity: 1 + float64(e.config.SeverityAlpha)*math.Log10(1+math.Abs(z)),
+			Severity: math.Min(12, math.Abs(z)),
 			Details:  nil,
 		}
 	}

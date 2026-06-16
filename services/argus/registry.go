@@ -70,7 +70,7 @@ func CreateDefaultRegistry() *PipelineRegistry {
 				MetricName: "rtt_p95_ns",
 				Extract: func(data any) (any, error) {
 					row := data.(argus_db.FetchPingSamplesRow)
-					return row.RttP95Ns, nil
+					return float64(row.RttP95Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},

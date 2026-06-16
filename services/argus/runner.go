@@ -54,7 +54,7 @@ func (d *Argus) Start(ctx context.Context) error {
 		Alpha:         0.001,
 		Threshold:     4,
 		Warmup:        40,
-		Epsilon:       1e-9,
+		Epsilon:       1e8,
 		SeverityAlpha: 2.2,
 	})
 
@@ -62,7 +62,7 @@ func (d *Argus) Start(ctx context.Context) error {
 		Logger: d.logger.With("DOMAIN", "POLICY_ENGINE"),
 		Query:  d.query,
 		LeakyBucketConfiguration: LeakyBucketConfiguration{
-			OpenThreshold:    8,
+			OpenThreshold:    5,
 			CloseThreshold:   3,
 			DecayPerSecond:   0.1,
 			BaseContribution: 1,

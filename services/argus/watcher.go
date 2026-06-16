@@ -1,12 +1,13 @@
 package argus
 
 import (
-	argus_db "cepheus/services/argus/db"
-	"cepheus/services/argus/types"
 	"context"
 	"log/slog"
 	"sync"
 	"time"
+
+	argus_db "cepheus/services/argus/db"
+	"cepheus/services/argus/types"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -47,6 +48,8 @@ func (w *Watcher) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			go w.getStampSeries(ctx)
+			go w.getPingSeries(ctx)
+			go w.getTraceSeries(ctx)
 		}
 	}
 }
@@ -70,6 +73,69 @@ func (w *Watcher) getStampSeries(ctx context.Context) error {
 		}
 
 		// Emit each series exactly once; the worker tracks it from there.
+		w.mu.Lock()
+		if _, exists := w.seen[ds]; exists {
+			w.mu.Unlock()
+			continue
+		}
+		w.seen[ds] = struct{}{}
+		w.mu.Unlock()
+
+		w.workCh <- ds
+	}
+
+	return nil
+}
+
+func (w *Watcher) getPingSeries(ctx context.Context) error {
+	series, err := w.query.ListActivePingSeries(ctx, pgtype.Timestamptz{
+		Time:  time.Now().Add(-24 * time.Hour),
+		Valid: true,
+	})
+	if err != nil {
+		w.logger.ErrorContext(ctx, "failed to list active ping series", "error", err)
+		return err
+	}
+
+	for _, s := range series {
+		ds := DiscoveredSeries{
+			Type:     types.SeriesTypePing,
+			SerialId: s.SerialID,
+			Target:   s.Target,
+		}
+
+		w.mu.Lock()
+		if _, exists := w.seen[ds]; exists {
+			w.mu.Unlock()
+			continue
+		}
+		w.seen[ds] = struct{}{}
+		w.mu.Unlock()
+
+		w.workCh <- ds
+	}
+
+	return nil
+}
+
+func (w *Watcher) getTraceSeries(ctx context.Context) error {
+	series, err := w.query.ListActiveTraceSeries(ctx, pgtype.Timestamptz{
+		Time:  time.Now().Add(-24 * time.Hour),
+		Valid: true,
+	})
+	if err != nil {
+		w.logger.ErrorContext(ctx, "failed to list active trace series", "error", err)
+		return err
+	}
+
+	for _, s := range series {
+		ds := DiscoveredSeries{
+			Type:     types.SeriesTypeTrace,
+			SerialId: s.SerialID,
+			Src:      s.Src.String(),
+			Target:   s.Dst.String(),
+		}
+
 		w.mu.Lock()
 		if _, exists := w.seen[ds]; exists {
 			w.mu.Unlock()

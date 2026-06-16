@@ -263,6 +263,7 @@ func (p *PolicyEngine) ApplyFinding(ctx context.Context, seriesKey types.SeriesK
 	if !ok {
 		stateRaw, err := p.query.GetPolicyState(ctx, argus_db.GetPolicyStateParams{
 			SerialID: seriesKey.SerialId,
+			SrcIp:    seriesKey.SrcIP,
 			Target:   seriesKey.Target,
 			Port:     seriesKey.Port,
 			Metric:   seriesKey.Metric,
@@ -476,6 +477,7 @@ func (p *PolicyEngine) savePolicyState(ctx context.Context, seriesKey types.Seri
 
 	err := p.query.UpsertPolicyState(ctx, argus_db.UpsertPolicyStateParams{
 		SerialID: seriesKey.SerialId,
+		SrcIp:    seriesKey.SrcIP,
 		Target:   seriesKey.Target,
 		Port:     seriesKey.Port,
 		Metric:   seriesKey.Metric,
