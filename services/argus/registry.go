@@ -60,7 +60,10 @@ func CreateDefaultRegistry() *PipelineRegistry {
 				MetricName: "loss",
 				Extract: func(data any) (any, error) {
 					row := data.(argus_db.FetchStampSamplesRow)
-					return row.Loss, nil
+					return LossSample{
+						Sent:     int64(row.Sent),
+						Received: int64(row.Received),
+					}, nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeBetaB},
 			},
@@ -78,7 +81,10 @@ func CreateDefaultRegistry() *PipelineRegistry {
 				MetricName: "packet_loss_percent",
 				Extract: func(data any) (any, error) {
 					row := data.(argus_db.FetchPingSamplesRow)
-					return row.Loss, nil
+					return LossSample{
+						Sent:     int64(row.Sent),
+						Received: int64(row.Received),
+					}, nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeBetaB},
 			},

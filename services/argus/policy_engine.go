@@ -366,7 +366,7 @@ func (p *PolicyEngine) ApplyFinding(ctx context.Context, seriesKey types.SeriesK
 				OpenedAt:     pgtype.Timestamptz{Time: finding.TS, Valid: true},
 				FindingCount: int32(len(state.PendingFindings)),
 				PeakSeverity: peakSeverity,
-				Detectors:    []string{"ewma"},
+				Detectors:    []string{string(seriesKey.Detector)},
 			})
 			if err != nil {
 				p.logger.ErrorContext(ctx, "failed to open event", log.Err(err))

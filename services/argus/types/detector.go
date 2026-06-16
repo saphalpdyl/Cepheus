@@ -40,6 +40,18 @@ type EwmaFindingDetails struct {
 
 func (e *EwmaFindingDetails) DetectorName() string { return string(DetectorTypeEwma) }
 
+// BetaBinomialFindingDetails details
+type BetaBinomialFindingDetails struct {
+	Tail      float64
+	Lost      int64
+	Sent      int64
+	Rate      float64
+	PostAlpha float64
+	PostBeta  float64
+}
+
+func (b *BetaBinomialFindingDetails) DetectorName() string { return string(DetectorTypeBetaB) }
+
 // Detector is the one interface the worker talks to. It is deliberately not
 // generic: the worker hands over the prior baseline state and an opaque value,
 // and each detector asserts the concrete type it expects on line one. That

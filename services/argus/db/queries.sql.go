@@ -46,7 +46,7 @@ func (q *Queries) CloseEvent(ctx context.Context, arg CloseEventParams) error {
 }
 
 const fetchPingSamples = `-- name: FetchPingSamples :many
-SELECT timestamp, loss, rtt_p95_ns
+SELECT timestamp, rtt_p95_ns, sent, received
 FROM ping_measurements
 WHERE serial_id = $1
   AND target = $2
@@ -63,8 +63,9 @@ type FetchPingSamplesParams struct {
 
 type FetchPingSamplesRow struct {
 	Timestamp pgtype.Timestamptz
-	Loss      float64
 	RttP95Ns  int64
+	Sent      int32
+	Received  int32
 }
 
 func (q *Queries) FetchPingSamples(ctx context.Context, arg FetchPingSamplesParams) ([]FetchPingSamplesRow, error) {
@@ -81,7 +82,12 @@ func (q *Queries) FetchPingSamples(ctx context.Context, arg FetchPingSamplesPara
 	var items []FetchPingSamplesRow
 	for rows.Next() {
 		var i FetchPingSamplesRow
-		if err := rows.Scan(&i.Timestamp, &i.Loss, &i.RttP95Ns); err != nil {
+		if err := rows.Scan(
+			&i.Timestamp,
+			&i.RttP95Ns,
+			&i.Sent,
+			&i.Received,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -93,7 +99,7 @@ func (q *Queries) FetchPingSamples(ctx context.Context, arg FetchPingSamplesPara
 }
 
 const fetchStampSamples = `-- name: FetchStampSamples :many
-SELECT timestamp, loss, rtt_p95_ns, fwd_p95_ns, bwd_p95_ns
+SELECT timestamp, rtt_p95_ns, fwd_p95_ns, bwd_p95_ns, sent, received
 FROM stamp_measurements
 WHERE serial_id = $1
   AND target = $2
@@ -112,10 +118,11 @@ type FetchStampSamplesParams struct {
 
 type FetchStampSamplesRow struct {
 	Timestamp pgtype.Timestamptz
-	Loss      float64
 	RttP95Ns  int64
 	FwdP95Ns  int64
 	BwdP95Ns  int64
+	Sent      int32
+	Received  int32
 }
 
 func (q *Queries) FetchStampSamples(ctx context.Context, arg FetchStampSamplesParams) ([]FetchStampSamplesRow, error) {
@@ -135,10 +142,11 @@ func (q *Queries) FetchStampSamples(ctx context.Context, arg FetchStampSamplesPa
 		var i FetchStampSamplesRow
 		if err := rows.Scan(
 			&i.Timestamp,
-			&i.Loss,
 			&i.RttP95Ns,
 			&i.FwdP95Ns,
 			&i.BwdP95Ns,
+			&i.Sent,
+			&i.Received,
 		); err != nil {
 			return nil, err
 		}

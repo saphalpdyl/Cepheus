@@ -58,6 +58,11 @@ func (d *Argus) Start(ctx context.Context) error {
 		SeverityAlpha: 2.2,
 	})
 
+	betab := NewBetaBinomial(BetaBinomialConfig{
+		Threshold: 0.0001,
+		Warmup:    50,
+	})
+
 	d.policyEngine, err = NewPolicyEngine(PolicyEngineConfig{
 		Logger: d.logger.With("DOMAIN", "POLICY_ENGINE"),
 		Query:  d.query,
@@ -88,7 +93,8 @@ func (d *Argus) Start(ctx context.Context) error {
 	// each detector lands; the worker looks them up by type and skips any that
 	// aren't registered yet.
 	detectors := map[types.DetectorType]types.Detector{
-		types.DetectorTypeEwma: ewma,
+		types.DetectorTypeEwma:  ewma,
+		types.DetectorTypeBetaB: betab,
 	}
 
 	registry := CreateDefaultRegistry()

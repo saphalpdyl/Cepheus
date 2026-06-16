@@ -33,7 +33,7 @@ FROM trace_measurements
 WHERE timestamp >= $1;
 
 -- name: FetchStampSamples :many
-SELECT timestamp, loss, rtt_p95_ns, fwd_p95_ns, bwd_p95_ns
+SELECT timestamp, rtt_p95_ns, fwd_p95_ns, bwd_p95_ns, sent, received
 FROM stamp_measurements
 WHERE serial_id = $1
   AND target = $2
@@ -42,7 +42,7 @@ WHERE serial_id = $1
   AND timestamp <= @before;
 
 -- name: FetchPingSamples :many
-SELECT timestamp, loss, rtt_p95_ns
+SELECT timestamp, rtt_p95_ns, sent, received
 FROM ping_measurements
 WHERE serial_id = $1
   AND target = $2
