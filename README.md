@@ -2,6 +2,9 @@
 
 ---
 
+> [!IMPORTANT]
+> The repository on GitHub is a mirror maintained for visibility. Issue tracking and active development are done on [GitLab.](https://gitlab.com/saphalpdyl/Cepheus)
+
 Modularized route health monitoring with software-based agents for managed network systems.
 
 ### Table of Contents
