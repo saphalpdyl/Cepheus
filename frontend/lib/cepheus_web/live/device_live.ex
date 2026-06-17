@@ -38,10 +38,14 @@ defmodule CepheusWeb.DeviceLive do
          |> push_navigate(to: ~p"/")}
 
       device ->
+        stamp_targets = Dashboard.list_stamp_targets(serial_id)
+        chart_metric = if stamp_targets == [], do: "ping", else: "rtt"
+
         {:noreply,
          socket
          |> assign(:device, device)
          |> assign(:page_title, "Cepheus · #{device.serial_id}")
+         |> assign(:chart_metric, chart_metric)
          |> load_show()}
     end
   end

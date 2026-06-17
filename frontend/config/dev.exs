@@ -1,8 +1,11 @@
 import Config
 
+# Editor tooling (credo, compilation) loads dev config outside docker-compose,
+# so fall back to a dummy URL when DATABASE_URL is unset. Real runs still get a
+# proper value injected by docker-compose; runtime.exs enforces it for prod.
 database_url =
   System.get_env("DATABASE_URL") ||
-    raise "DATABASE_URL is missing. The frontend must be run inside docker-compose."
+    "ecto://postgres:postgres@localhost/cepheus_dev"
 
 config :cepheus, Cepheus.Repo,
   url: database_url,
