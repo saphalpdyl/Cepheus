@@ -1,16 +1,20 @@
 defmodule Cepheus.Dashboard do
   alias Cepheus.Repo
 
-  # window => {sql interval literal, time_bucket size for charts}
+  # window key => {sql interval literal, time_bucket size for charts}
   @windows %{
-    "1 minute" => {"1 minute", "5 seconds"},
-    "5 minutes" => {"5 minutes", "15 seconds"},
-    "15 minutes" => {"15 minutes", "30 seconds"},
-    "1 hour" => {"1 hour", "2 minutes"},
-    "6 hours" => {"6 hours", "10 minutes"}
+    "15m" => {"15 minutes", "15 seconds"},
+    "1h" => {"1 hour", "2 minutes"},
+    "6h" => {"6 hours", "10 minutes"},
+    "24h" => {"24 hours", "30 minutes"}
   }
 
-  def windows, do: Map.keys(@windows)
+  # Display order for the window switch (Map.keys/1 is unordered).
+  @window_order ["15m", "1h", "6h", "24h"]
+
+  def windows, do: @window_order
+
+  def default_window, do: "15m"
 
   def valid_window?(w), do: Map.has_key?(@windows, w)
 
@@ -292,7 +296,8 @@ defmodule Cepheus.Dashboard do
            m.target,
            AVG(m.rtt_p95_ns)::BIGINT                      AS rtt_p95_ns,
            AVG(m.fwd_p95_ns)::BIGINT  AS fwd_p95_ns,
-           AVG(m.bwd_p95_ns)::BIGINT  AS bwd_p95_ns
+           AVG(m.bwd_p95_ns)::BIGINT  AS bwd_p95_ns,
+           AVG(m.loss)::FLOAT         AS loss
     FROM stamp_measurements m
     WHERE m.serial_id = $1
       AND m.timestamp > NOW() - INTERVAL '#{interval}'
@@ -304,31 +309,42 @@ defmodule Cepheus.Dashboard do
     %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, params)
 
     rows
-    |> Enum.group_by(fn [_bucket, target, _rtt, _fwd, _bwd] -> target end)
+    |> Enum.group_by(fn [_bucket, target, _rtt, _fwd, _bwd, _loss] -> target end)
     |> Enum.flat_map(fn {target, points} ->
       rtt_data =
-        Enum.map(points, fn [%DateTime{} = bucket, _target, rtt, _fwd, _bwd] ->
+        Enum.map(points, fn [%DateTime{} = bucket, _target, rtt, _fwd, _bwd, _loss] ->
           [DateTime.to_unix(bucket, :millisecond), rtt]
         end)
 
       fwd_data =
-        Enum.map(points, fn [%DateTime{} = bucket, _target, _rtt, fwd, _bwd] ->
+        Enum.map(points, fn [%DateTime{} = bucket, _target, _rtt, fwd, _bwd, _loss] ->
           [DateTime.to_unix(bucket, :millisecond), fwd]
         end)
 
       bwd_data =
-        Enum.map(points, fn [%DateTime{} = bucket, _target, _rtt, _fwd, bwd] ->
+        Enum.map(points, fn [%DateTime{} = bucket, _target, _rtt, _fwd, bwd, _loss] ->
           [DateTime.to_unix(bucket, :millisecond), bwd]
+        end)
+
+      loss_data =
+        Enum.map(points, fn [%DateTime{} = bucket, _target, _rtt, _fwd, _bwd, loss] ->
+          [DateTime.to_unix(bucket, :millisecond), loss_pct(loss)]
         end)
 
       [
         %{name: "RTT · #{target}", data: rtt_data},
         %{name: "Forward · #{target}", data: fwd_data},
-        %{name: "Backward · #{target}", data: bwd_data}
+        %{name: "Backward · #{target}", data: bwd_data},
+        %{name: "Loss % · #{target}", data: loss_data}
       ]
     end)
     |> Enum.sort_by(& &1.name)
   end
+
+  # Loss is stored as a 0.0–1.0 fraction; the chart plots it as a percentage on
+  # a dedicated secondary axis.
+  defp loss_pct(nil), do: nil
+  defp loss_pct(loss), do: Float.round(loss * 100, 2)
 
   @target_list_window "24 hours"
 
@@ -424,7 +440,8 @@ defmodule Cepheus.Dashboard do
     SELECT time_bucket(INTERVAL '#{bucket}', m.timestamp) AS bucket,
            m.target,
            AVG(m.rtt_avg_ns)::BIGINT                      AS rtt_avg_ns,
-           AVG(m.rtt_p95_ns)::BIGINT                      AS rtt_p95_ns
+           AVG(m.rtt_p95_ns)::BIGINT                      AS rtt_p95_ns,
+           AVG(m.loss)::FLOAT                             AS loss
     FROM ping_measurements m
     WHERE m.serial_id = $1
       AND m.timestamp > NOW() - INTERVAL '#{interval}'
@@ -436,21 +453,27 @@ defmodule Cepheus.Dashboard do
     %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, params)
 
     rows
-    |> Enum.group_by(fn [_bucket, target, _avg, _p95] -> target end)
+    |> Enum.group_by(fn [_bucket, target, _avg, _p95, _loss] -> target end)
     |> Enum.flat_map(fn {target, points} ->
       avg_data =
-        Enum.map(points, fn [%DateTime{} = bucket, _target, avg, _p95] ->
+        Enum.map(points, fn [%DateTime{} = bucket, _target, avg, _p95, _loss] ->
           [DateTime.to_unix(bucket, :millisecond), avg]
         end)
 
       p95_data =
-        Enum.map(points, fn [%DateTime{} = bucket, _target, _avg, p95] ->
+        Enum.map(points, fn [%DateTime{} = bucket, _target, _avg, p95, _loss] ->
           [DateTime.to_unix(bucket, :millisecond), p95]
+        end)
+
+      loss_data =
+        Enum.map(points, fn [%DateTime{} = bucket, _target, _avg, _p95, loss] ->
+          [DateTime.to_unix(bucket, :millisecond), loss_pct(loss)]
         end)
 
       [
         %{name: "avg · #{target}", data: avg_data},
-        %{name: "p95 · #{target}", data: p95_data}
+        %{name: "p95 · #{target}", data: p95_data},
+        %{name: "Loss % · #{target}", data: loss_data}
       ]
     end)
     |> Enum.sort_by(& &1.name)
@@ -646,5 +669,373 @@ defmodule Cepheus.Dashboard do
 
     %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [])
     Map.new(rows, fn [serial_id, count] -> {serial_id, count} end)
+  end
+
+  @doc "Total number of currently-open events across the whole fleet."
+  def total_open_events do
+    open_event_counts_by_device() |> Map.values() |> Enum.sum()
+  end
+
+  @doc """
+  Per-device open-event stats: `serial_id => {count, max_peak_severity}`. Used to
+  derive a fleet agent's health (alert vs degraded) on the overview page.
+  """
+  def open_event_stats_by_device do
+    sql = """
+    SELECT serial_id, COUNT(*)::int, MAX(peak_severity)
+    FROM argus_events
+    WHERE status = 'open'
+    GROUP BY serial_id
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [])
+    Map.new(rows, fn [serial_id, count, max_peak] -> {serial_id, {count, max_peak}} end)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Fleet overview rollups
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  One row per agent for the fleet overview: target count, STAMP/Ping p95, worst
+  loss, open-event count, a short RTT trend series (for the tick-strip) and a
+  derived health status. Composed from the per-device rollups (a handful of
+  queries per agent) — fine for the current fleet size.
+  """
+  def fleet_agents(window) when is_binary(window) do
+    devices = list_devices()
+    stats = open_event_stats_by_device()
+
+    Enum.map(devices, fn d ->
+      stamp = summary_by_target(d.serial_id, window)
+      ping = ping_summary_by_target(d.serial_id, window)
+      series = measurement_timeseries(d.serial_id, window)
+
+      trend =
+        series
+        |> Enum.filter(&String.starts_with?(&1.name, "RTT ·"))
+        |> Enum.flat_map(& &1.data)
+        |> Enum.map(fn [_ts, v] -> v end)
+
+      {open_count, max_peak} = Map.get(stats, d.serial_id, {0, nil})
+      last_seen = latest_seen(stamp ++ ping)
+
+      targets =
+        (Enum.map(stamp, & &1.target) ++ Enum.map(ping, & &1.target)) |> Enum.uniq() |> length()
+
+      %{
+        serial_id: d.serial_id,
+        region: nil,
+        targets: targets,
+        stamp_p95_ns: avg_ns(Enum.map(stamp, & &1.avg_rtt_p95_ns)),
+        ping_p95_ns: avg_ns(Enum.map(ping, & &1.avg_p95_ns)),
+        worst_loss: max_float(Enum.map(stamp, & &1.loss) ++ Enum.map(ping, & &1.loss)),
+        open_events: open_count,
+        trend: trend,
+        status: agent_status(open_count, max_peak, last_seen, d.report_interval_seconds)
+      }
+    end)
+  end
+
+  @doc """
+  Fleet-wide heartbeat KPIs derived from a `fleet_agents/1` result — no extra
+  queries. Returns open events, STAMP p95, Ping p95 and worst loss.
+  """
+  def heartbeat_from_agents(agents) when is_list(agents) do
+    %{
+      open_events: agents |> Enum.map(& &1.open_events) |> Enum.sum(),
+      stamp_p95_ns: avg_ns(Enum.map(agents, & &1.stamp_p95_ns)),
+      ping_p95_ns: avg_ns(Enum.map(agents, & &1.ping_p95_ns)),
+      worst_loss: max_float(Enum.map(agents, & &1.worst_loss))
+    }
+  end
+
+  @doc """
+  Detection-family summary tiles for the overview. Groups events (open + recent)
+  by family (`stamp` | `ping` | `loss`) with open count, distinct agents and
+  total findings. The `path` family is omitted (detection not implemented).
+  """
+  def family_stats(window) when is_binary(window) do
+    interval = window_interval!(window)
+
+    sql = """
+    SELECT serial_id, metric, status, finding_count
+    FROM argus_events
+    WHERE status = 'open' OR opened_at > NOW() - INTERVAL '#{interval}'
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [])
+
+    acc =
+      Enum.reduce(rows, %{}, fn [serial_id, metric, status, findings], acc ->
+        family = metric_family(metric)
+        f = Map.get(acc, family, %{open: 0, agents: MapSet.new(), findings: 0})
+
+        f = %{
+          open: f.open + if(status == "open", do: 1, else: 0),
+          agents: MapSet.put(f.agents, serial_id),
+          findings: f.findings + (findings || 0)
+        }
+
+        Map.put(acc, family, f)
+      end)
+
+    for {id, label, detector} <- [
+          {"stamp", "STAMP latency", "EWMA"},
+          {"ping", "Ping RTT", "EWMA"},
+          {"loss", "Loss", "BETA-BINOMIAL"}
+        ] do
+      f = Map.get(acc, id, %{open: 0, agents: MapSet.new(), findings: 0})
+
+      %{
+        id: id,
+        label: label,
+        detector: detector,
+        open: f.open,
+        agents: MapSet.size(f.agents),
+        findings: f.findings
+      }
+    end
+  end
+
+  @doc """
+  Fleet-wide event list for the Alerts inbox: currently-open plus any opened in
+  the window, newest first (open before resolved), capped at 200. Filtering by
+  status/severity/text is done by the caller.
+  """
+  def all_events(window) when is_binary(window) do
+    interval = window_interval!(window)
+
+    sql = """
+    SELECT id::text, serial_id, target, port, metric, status,
+           opened_at, last_seen_at, closed_at, finding_count, peak_severity, detectors
+    FROM argus_events
+    WHERE status = 'open' OR opened_at > NOW() - INTERVAL '#{interval}'
+    ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, opened_at DESC
+    LIMIT 200
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [])
+
+    Enum.map(rows, fn [
+                        id,
+                        serial_id,
+                        target,
+                        port,
+                        metric,
+                        status,
+                        opened_at,
+                        last_seen_at,
+                        closed_at,
+                        finding_count,
+                        peak_severity,
+                        detectors
+                      ] ->
+      %{
+        id: id,
+        serial_id: serial_id,
+        target: target,
+        port: port,
+        metric: metric,
+        status: status,
+        display_status: derive_display_status(status, nil),
+        family: metric_family(metric),
+        opened_at: opened_at,
+        last_seen_at: last_seen_at,
+        closed_at: closed_at,
+        finding_count: finding_count,
+        peak_severity: peak_severity,
+        detectors: detectors || []
+      }
+    end)
+  end
+
+  @doc """
+  A single event plus its recent findings (newest first), for the Alerts triage
+  panel. Returns `nil` if the event id is missing or malformed.
+  """
+  def event_detail(event_id) when is_binary(event_id) do
+    with {:ok, uuid} <- Ecto.UUID.dump(event_id) do
+      event_sql = """
+      SELECT id::text, serial_id, target, port, metric, status,
+             opened_at, last_seen_at, closed_at, finding_count, peak_severity, detectors
+      FROM argus_events
+      WHERE id = $1
+      """
+
+      case Ecto.Adapters.SQL.query!(Repo, event_sql, [uuid]) do
+        %Postgrex.Result{rows: []} ->
+          nil
+
+        %Postgrex.Result{rows: [row]} ->
+          [id, serial_id, target, port, metric, status, opened_at, last_seen_at, closed_at,
+           finding_count, peak_severity, detectors] = row
+
+          findings_sql = """
+          SELECT ts, value, severity, details::text
+          FROM argus_findings
+          WHERE event_id = $1
+          ORDER BY ts DESC
+          LIMIT 50
+          """
+
+          %Postgrex.Result{rows: frows} = Ecto.Adapters.SQL.query!(Repo, findings_sql, [uuid])
+
+          findings =
+            Enum.map(frows, fn [ts, value, severity, details] ->
+              %{ts: ts, value: value, severity: severity, details: details}
+            end)
+
+          %{
+            event: %{
+              id: id,
+              serial_id: serial_id,
+              target: target,
+              port: port,
+              metric: metric,
+              status: status,
+              display_status: derive_display_status(status, nil),
+              family: metric_family(metric),
+              opened_at: opened_at,
+              last_seen_at: last_seen_at,
+              closed_at: closed_at,
+              finding_count: finding_count,
+              peak_severity: peak_severity,
+              detectors: detectors || []
+            },
+            findings: findings
+          }
+      end
+    else
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Top agent→target probe paths by STAMP p95 over the window, each with a small
+  RTT spark for the tick-strip. Capped at `limit`.
+  """
+  def probe_paths(window, limit \\ 8) when is_binary(window) and is_integer(limit) do
+    interval = window_interval!(window)
+
+    sql = """
+    SELECT serial_id, target, AVG(rtt_p95_ns)::bigint AS P95, MAX(timestamp) as last_seen
+    FROM stamp_measurements
+    WHERE timestamp > NOW() - interval '#{interval}'
+    GROUP BY serial_id, target, port
+
+    UNION ALL
+
+    SELECT serial_id, target, AVG(rtt_p95_ns)::bigint AS P95, MAX(timestamp) as last_seen
+    FROM ping_measurements
+    WHERE timestamp > NOW() - interval '#{interval}'
+    GROUP BY serial_id, target
+    ORDER BY P95 DESC NULLS LAST
+    LIMIT #{limit};
+
+    """
+
+    %Postgrex.Result{rows: rows} = Ecto.Adapters.SQL.query!(Repo, sql, [])
+
+    Enum.map(rows, fn [serial_id, target, p95, _last_seen] ->
+      spark =
+        serial_id
+        |> measurement_timeseries(window, [target])
+        |> Enum.filter(&String.starts_with?(&1.name, "RTT ·"))
+        |> Enum.flat_map(& &1.data)
+        |> Enum.map(fn [_ts, v] -> v end)
+
+      %{serial_id: serial_id, target: target, p95_ns: p95, spark: spark}
+    end)
+  end
+
+  @doc """
+  Jeffreys-prior loss summary from aggregate sent/received counts: posterior-ish
+  mean loss with a Wilson 95% interval, all as percentages. Returns `nil` when
+  there were no probes. Closed-form (no stats dependency) — the credible-interval
+  bar in the UI only needs a sane mean + lo/hi.
+  """
+  def loss_posterior(received, sent)
+      when is_integer(received) and is_integer(sent) and sent > 0 do
+    lost = max(sent - received, 0)
+    n = sent
+    p = lost / n
+    z = 1.96
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    margin = z / denom * :math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+
+    %{
+      mean_pct: p * 100,
+      lo_pct: max(center - margin, 0.0) * 100,
+      hi_pct: min(center + margin, 1.0) * 100
+    }
+  end
+
+  def loss_posterior(_received, _sent), do: nil
+
+  @doc """
+  Coarse detection family for an event/finding metric. Path is recognised but
+  callers omit it (detection not implemented). The STAMP/Ping split is a
+  best-effort string match since the stored metric may not always carry a
+  series prefix.
+  """
+  def metric_family(metric) when is_binary(metric) do
+    m = String.downcase(metric)
+
+    cond do
+      String.contains?(m, "loss") or String.contains?(m, "betabinom") -> "loss"
+      String.contains?(m, ["path", "asn", "link", "fingerprint"]) -> "path"
+      String.contains?(m, "ping") -> "ping"
+      true -> "stamp"
+    end
+  end
+
+  def metric_family(_), do: "stamp"
+
+  # ----- small rollup helpers -----
+
+  defp avg_ns(values) do
+    case Enum.filter(values, &is_integer/1) do
+      [] -> nil
+      ns -> div(Enum.sum(ns), length(ns))
+    end
+  end
+
+  defp max_float(values) do
+    case Enum.filter(values, &is_float/1) do
+      [] -> nil
+      fs -> Enum.max(fs)
+    end
+  end
+
+  defp latest_seen(rows) do
+    rows
+    |> Enum.map(& &1.last_seen)
+    |> Enum.filter(& &1)
+    |> case do
+      [] -> nil
+      stamps -> Enum.reduce(stamps, fn a, b -> if DateTime.compare(a, b) == :gt, do: a, else: b end)
+    end
+  end
+
+  # Health rollup: alert when a high-severity event is open, degraded when any
+  # event is open or the agent has gone stale, otherwise nominal.
+  defp agent_status(open_count, max_peak, last_seen, report_interval_seconds) do
+    stale =
+      case last_seen do
+        nil ->
+          true
+
+        dt ->
+          DateTime.diff(DateTime.utc_now(), dt) > max((report_interval_seconds || 60) * 2, 60)
+      end
+
+    cond do
+      open_count > 0 and is_float(max_peak) and max_peak >= 4.0 -> "alert"
+      open_count > 0 -> "degraded"
+      stale -> "degraded"
+      true -> "nominal"
+    end
   end
 end

@@ -1,10 +1,14 @@
-defmodule CepheusWeb.DashboardLive do
+defmodule CepheusWeb.DeviceLive do
+  @moduledoc """
+  Agent detail — per-agent Tier-1 detection: STAMP/Ping latency by target,
+  β-binomial loss, STAMP target rollups, detection events, per-sample findings,
+  and the probe-task editor.
+  """
   use CepheusWeb, :live_view
 
   alias Cepheus.Dashboard
 
   @refresh_ms 2_000
-  @default_window "5 minutes"
 
   @impl true
   def mount(_params, _session, socket) do
@@ -12,100 +16,63 @@ defmodule CepheusWeb.DashboardLive do
 
     socket =
       socket
-      |> assign(:window, @default_window)
+      |> assign(:window, Dashboard.default_window())
       |> assign(:windows, Dashboard.windows())
-      |> assign(:page_title, "Cepheus")
-      |> assign(:open_event_counts, %{})
-      |> assign(:events, [])
-      |> assign(:findings, [])
+      |> assign(:chart_metric, "rtt")
       |> assign(:expanded_findings, MapSet.new())
-      |> assign(:stamp_targets, [])
-      |> assign(:ping_targets, [])
       |> assign(:selected_stamp_targets, nil)
       |> assign(:selected_ping_targets, nil)
-      |> assign(:ping_summary, [])
-      |> assign(:ping_kpis, empty_ping_kpis())
       |> assign(:task_rows, [])
+      |> assign(:open_alerts_count, 0)
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_params(params, _uri, socket) do
-    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
-  end
-
-  defp apply_action(socket, :index, _params) do
-    socket
-    |> assign(:device, nil)
-    |> load_index()
-  end
-
-  defp apply_action(socket, :show, %{"serial_id" => serial_id}) do
+  def handle_params(%{"serial_id" => serial_id}, _uri, socket) do
     case Dashboard.get_device(serial_id) do
       nil ->
-        socket
-        |> put_flash(:error, "Device #{serial_id} not found")
-        |> push_navigate(to: ~p"/")
+        {:noreply,
+         socket
+         |> put_flash(:error, "Agent #{serial_id} not found")
+         |> push_navigate(to: ~p"/")}
 
       device ->
-        socket
-        |> assign(:device, device)
-        |> assign(:page_title, "Cepheus · #{device.serial_id}")
-        |> load_show()
+        {:noreply,
+         socket
+         |> assign(:device, device)
+         |> assign(:page_title, "Cepheus · #{device.serial_id}")
+         |> load_show()}
     end
   end
 
   @impl true
   def handle_info(:tick, socket) do
     schedule_tick()
-
-    socket =
-      case socket.assigns.live_action do
-        :index -> load_index(socket)
-        :show -> load_show(socket)
-      end
-
-    {:noreply, socket}
+    {:noreply, load_show(socket)}
   end
 
   @impl true
   def handle_event("set_window", %{"window" => window}, socket) do
-    if Dashboard.valid_window?(window) do
-      socket = assign(socket, :window, window)
+    if Dashboard.valid_window?(window),
+      do: {:noreply, socket |> assign(:window, window) |> load_show()},
+      else: {:noreply, socket}
+  end
 
-      socket =
-        case socket.assigns.live_action do
-          :index -> load_index(socket)
-          :show -> load_show(socket)
-        end
+  def handle_event("refresh", _params, socket), do: {:noreply, load_show(socket)}
 
-      {:noreply, socket}
-    else
-      {:noreply, socket}
-    end
+  def handle_event("set_chart_metric", %{"metric" => metric}, socket) when metric in ["rtt", "ping"] do
+    {:noreply, socket |> assign(:chart_metric, metric) |> load_show()}
   end
 
   def handle_event("set_stamp_targets", params, socket) do
     selected = params |> Map.get("targets", []) |> List.wrap()
-
-    socket =
-      socket
-      |> assign(:selected_stamp_targets, selected)
-      |> load_show()
-
-    {:noreply, socket}
+    {:noreply, socket |> assign(:selected_stamp_targets, selected) |> load_show()}
   end
 
   def handle_event("set_ping_targets", params, socket) do
     selected = params |> Map.get("targets", []) |> List.wrap()
-
-    socket =
-      socket
-      |> assign(:selected_ping_targets, selected)
-      |> load_show()
-
-    {:noreply, socket}
+    {:noreply, socket |> assign(:selected_ping_targets, selected) |> load_show()}
   end
 
   def handle_event("toggle_finding_group", %{"key" => key}, socket) do
@@ -119,7 +86,7 @@ defmodule CepheusWeb.DashboardLive do
     {:noreply, assign(socket, :expanded_findings, expanded)}
   end
 
-  # ----- Task editor -----
+  # ----- Task editor (carried over from the previous dashboard) -----
 
   def handle_event("add_task_row", params, socket) do
     types = Enum.map(Dashboard.task_types(), &elem(&1, 1))
@@ -170,18 +137,152 @@ defmodule CepheusWeb.DashboardLive do
 
     with {:ok, tasks} <- build_tasks(socket.assigns.task_rows, device.agent_config_id),
          {:ok, generation} <- Dashboard.add_tasks(device.agent_config_id, tasks) do
-      socket =
-        socket
-        |> assign(:task_rows, [])
-        |> assign(:device, Dashboard.get_device(device.serial_id))
-        |> put_flash(:info, "Added #{length(tasks)} task(s) · agent now on generation #{generation}")
-        |> load_show()
-
-      {:noreply, socket}
+      {:noreply,
+       socket
+       |> assign(:task_rows, [])
+       |> assign(:device, Dashboard.get_device(device.serial_id))
+       |> put_flash(:info, "Added #{length(tasks)} task(s) · agent now on generation #{generation}")
+       |> load_show()}
     else
       {:error, message} -> {:noreply, put_flash(socket, :error, message)}
     end
   end
+
+  defp schedule_tick, do: Process.send_after(self(), :tick, @refresh_ms)
+
+  defp load_show(socket) do
+    %{
+      device: device,
+      window: window,
+      chart_metric: chart_metric,
+      selected_stamp_targets: sel_stamp,
+      selected_ping_targets: sel_ping
+    } = socket.assigns
+
+    tasks = Dashboard.list_tasks_for_config(device.agent_config_id)
+    stamp_targets = Dashboard.list_stamp_targets(device.serial_id)
+    ping_targets = Dashboard.list_ping_targets(device.serial_id)
+
+    summary = Dashboard.summary_by_target(device.serial_id, window)
+    ping_summary = Dashboard.ping_summary_by_target(device.serial_id, window)
+    events = Dashboard.events_for_device(device.serial_id, window)
+    findings = Dashboard.recent_findings_for_device(device.serial_id, window)
+
+    {loss_rows, loss_cap} = build_loss_rows(summary, ping_summary)
+
+    socket
+    |> assign(:tasks, tasks)
+    |> assign(:stamp_targets, stamp_targets)
+    |> assign(:ping_targets, ping_targets)
+    |> assign(:summary, summary)
+    |> assign(:ping_summary, ping_summary)
+    |> assign(:ping_by_target, Map.new(ping_summary, &{&1.target, &1}))
+    |> assign(:vitals, compute_vitals(summary, ping_summary, events))
+    |> assign(:loss_rows, loss_rows)
+    |> assign(:loss_cap, loss_cap)
+    |> assign(:events, events)
+    |> assign(:findings, findings)
+    |> assign(:open_alerts_count, Dashboard.total_open_events())
+    |> push_event("latency-chart:update", %{
+      series: chart_series(device.serial_id, window, chart_metric, sel_stamp, sel_ping)
+    })
+  end
+
+  # Build the one-line-per-target series for the latency chart, depending on the
+  # selected metric (STAMP RTT p95 vs Ping RTT p95). Names are stripped to just
+  # the target so the legend reads cleanly.
+  defp chart_series(serial_id, window, "ping", _sel_stamp, sel_ping) do
+    serial_id
+    |> Dashboard.ping_timeseries(window, sel_ping)
+    |> Enum.filter(&String.starts_with?(&1.name, "p95 · "))
+    |> Enum.map(&strip_prefix(&1, "p95 · "))
+  end
+
+  defp chart_series(serial_id, window, _rtt, sel_stamp, _sel_ping) do
+    serial_id
+    |> Dashboard.measurement_timeseries(window, sel_stamp)
+    |> Enum.filter(&String.starts_with?(&1.name, "RTT · "))
+    |> Enum.map(&strip_prefix(&1, "RTT · "))
+  end
+
+  defp strip_prefix(%{name: name} = series, prefix),
+    do: %{series | name: String.replace_prefix(name, prefix, "")}
+
+  defp compute_vitals(summary, ping_summary, events) do
+    targets =
+      (Enum.map(summary, & &1.target) ++ Enum.map(ping_summary, & &1.target))
+      |> Enum.uniq()
+      |> length()
+
+    %{
+      targets: targets,
+      stamp_p95_ns: avg_ns(Enum.map(summary, & &1.avg_rtt_p95_ns)),
+      ping_p95_ns: avg_ns(Enum.map(ping_summary, & &1.avg_p95_ns)),
+      worst_loss: max_loss(Enum.map(summary, & &1.loss) ++ Enum.map(ping_summary, & &1.loss)),
+      open_events: Enum.count(events, &(&1.status == "open"))
+    }
+  end
+
+  # One row per target with STAMP + Ping loss posteriors, plus a shared bar cap.
+  defp build_loss_rows(summary, ping_summary) do
+    stamp_by = Map.new(summary, &{&1.target, &1})
+    ping_by = Map.new(ping_summary, &{&1.target, &1})
+
+    targets =
+      (Enum.map(summary, & &1.target) ++ Enum.map(ping_summary, & &1.target))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    rows =
+      Enum.map(targets, fn target ->
+        stamp = Map.get(stamp_by, target)
+        ping = Map.get(ping_by, target)
+
+        %{
+          target: target,
+          stamp: stamp,
+          ping: ping,
+          stamp_model: model_for(stamp),
+          ping_model: model_for(ping)
+        }
+      end)
+
+    cap =
+      rows
+      |> Enum.flat_map(fn r -> [r.stamp_model, r.ping_model] end)
+      |> Enum.filter(& &1)
+      |> Enum.map(& &1.hi_pct)
+      |> case do
+        [] -> 0.6
+        his -> max(0.6, Enum.max(his) * 1.1)
+      end
+
+    {rows, cap}
+  end
+
+  defp model_for(nil), do: nil
+
+  defp model_for(%{received: received, sent: sent})
+       when is_integer(received) and is_integer(sent),
+       do: Dashboard.loss_posterior(received, sent)
+
+  defp model_for(_), do: nil
+
+  defp avg_ns(values) do
+    case Enum.filter(values, &is_integer/1) do
+      [] -> nil
+      ns -> div(Enum.sum(ns), length(ns))
+    end
+  end
+
+  defp max_loss(values) do
+    case Enum.filter(values, &is_float/1) do
+      [] -> nil
+      fs -> Enum.max(fs)
+    end
+  end
+
+  # ----- task building / validation (verbatim from the previous dashboard) -----
 
   defp build_tasks([], _config_id), do: {:error, "Add at least one task before saving."}
 
@@ -314,109 +415,4 @@ defmodule CepheusWeb.DashboardLive do
     |> String.replace(~r/[^a-z0-9]+/, "-")
     |> String.trim("-")
   end
-
-  defp schedule_tick, do: Process.send_after(self(), :tick, @refresh_ms)
-
-  defp load_index(socket) do
-    devices = Dashboard.list_devices()
-    window = socket.assigns.window
-
-    summaries =
-      Map.new(devices, fn d ->
-        {d.serial_id, Dashboard.summary_by_target(d.serial_id, window)}
-      end)
-
-    open_event_counts = Dashboard.open_event_counts_by_device()
-
-    socket
-    |> assign(:devices, devices)
-    |> assign(:summary_by_serial, summaries)
-    |> assign(:open_event_counts, open_event_counts)
-    |> assign(:last_loaded_at, DateTime.utc_now())
-  end
-
-  defp load_show(socket) do
-    %{
-      device: device,
-      window: window,
-      selected_stamp_targets: sel_stamp,
-      selected_ping_targets: sel_ping
-    } = socket.assigns
-
-    tasks = Dashboard.list_tasks_for_config(device.agent_config_id)
-    stamp_targets = Dashboard.list_stamp_targets(device.serial_id)
-    ping_targets = Dashboard.list_ping_targets(device.serial_id)
-
-    summary = Dashboard.summary_by_target(device.serial_id, window, sel_stamp)
-    series = Dashboard.measurement_timeseries(device.serial_id, window, sel_stamp)
-    ping_summary = Dashboard.ping_summary_by_target(device.serial_id, window, sel_ping)
-    ping_series = Dashboard.ping_timeseries(device.serial_id, window, sel_ping)
-    events = Dashboard.events_for_device(device.serial_id, window)
-    findings = Dashboard.recent_findings_for_device(device.serial_id, window)
-
-    socket
-    |> assign(:tasks, tasks)
-    |> assign(:stamp_targets, stamp_targets)
-    |> assign(:ping_targets, ping_targets)
-    |> assign(:summary, summary)
-    |> assign(:ping_summary, ping_summary)
-    |> assign(:kpis, compute_kpis(summary))
-    |> assign(:ping_kpis, compute_ping_kpis(ping_summary))
-    |> assign(:events, events)
-    |> assign(:findings, findings)
-    |> assign(:last_loaded_at, DateTime.utc_now())
-    |> push_event("rtt-chart:update", %{series: series})
-    |> push_event("ping-chart:update", %{series: ping_series})
-  end
-
-  defp compute_kpis(summary) do
-    targets = length(summary)
-    measurements = Enum.reduce(summary, 0, &(&1.measurements + &2))
-
-    avg_p95_ns =
-      case Enum.filter(summary, & &1.avg_rtt_p95_ns) do
-        [] -> nil
-        rows -> Enum.sum(Enum.map(rows, & &1.avg_rtt_p95_ns)) |> div(length(rows))
-      end
-
-    worst_loss =
-      case Enum.filter(summary, & &1.loss) do
-        [] -> nil
-        rows -> rows |> Enum.map(& &1.loss) |> Enum.max()
-      end
-
-    %{
-      targets: targets,
-      measurements: measurements,
-      avg_p95_ns: avg_p95_ns,
-      worst_loss: worst_loss
-    }
-  end
-
-  defp compute_ping_kpis(summary) do
-    targets = length(summary)
-    measurements = Enum.reduce(summary, 0, &(&1.measurements + &2))
-
-    avg_rtt_ns =
-      case Enum.filter(summary, & &1.avg_rtt_ns) do
-        [] -> nil
-        rows -> Enum.sum(Enum.map(rows, & &1.avg_rtt_ns)) |> div(length(rows))
-      end
-
-    worst_loss =
-      case Enum.filter(summary, & &1.loss) do
-        [] -> nil
-        rows -> rows |> Enum.map(& &1.loss) |> Enum.max()
-      end
-
-    %{
-      targets: targets,
-      measurements: measurements,
-      avg_rtt_ns: avg_rtt_ns,
-      worst_loss: worst_loss
-    }
-  end
-
-  defp empty_ping_kpis,
-    do: %{targets: 0, measurements: 0, avg_rtt_ns: nil, worst_loss: nil}
 end

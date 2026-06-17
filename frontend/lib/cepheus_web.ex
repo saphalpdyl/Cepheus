@@ -76,6 +76,7 @@ defmodule CepheusWeb do
     quote do
       import Phoenix.HTML
       import CepheusWeb.CoreComponents
+      import CepheusWeb.CepheusComponents
 
       alias Phoenix.LiveView.JS
       alias CepheusWeb.Layouts

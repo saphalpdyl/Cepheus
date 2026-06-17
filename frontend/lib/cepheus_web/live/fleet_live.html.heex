@@ -1,0 +1,139 @@
+<Layouts.app
+  flash={@flash}
+  active_nav={:overview}
+  open_alerts_count={@open_alerts_count}
+  window={@window}
+  windows={@windows}
+>
+  <:breadcrumb>
+    <span class="text-sl-500">argus</span>
+    <span class="text-sl-300">/</span>
+    <span class="font-medium text-ink">Fleet overview</span>
+  </:breadcrumb>
+
+  <div class="flex items-center gap-3">
+    <h1 class="text-base font-semibold text-ink">Network</h1>
+    <span class="text-xs text-sl-500">
+      {length(@agents)} agents · {@total_targets} targets · Tier-1 detection
+    </span>
+    <.link
+      navigate={~p"/alerts"}
+      class="ml-auto inline-flex items-center gap-1.5 rounded-[5px] border border-sl-200 bg-paper px-2.5 py-1 text-xs font-medium text-sl-700 hover:bg-canvas-alt"
+    >
+      <.icon name="hero-exclamation-triangle" class="size-3.5 text-sl-400" />
+      Triage {@open_alerts_count} alerts
+    </.link>
+  </div>
+
+  <.card title="Detection families" meta="end-to-end signals · click to triage" body_class="tight">
+    <div class="grid grid-cols-3 max-[1180px]:grid-cols-1">
+      <.family_tile :for={f <- @families} family={f} />
+    </div>
+  </.card>
+
+  <.card title="Network heartbeat" meta={"window #{@window}"} body_class="pad">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-4">
+      <.metric label="Open events" tone={(@heartbeat.open_events > 0 && "crit") || "ok"}>
+        {@heartbeat.open_events}
+      </.metric>
+      <.metric label="STAMP p95">{fmt_rtt(@heartbeat.stamp_p95_ns)}</.metric>
+      <.metric label="Ping p95">{fmt_rtt(@heartbeat.ping_p95_ns)}</.metric>
+      <.metric label="Worst loss" tone={loss_tone_for(@heartbeat.worst_loss)}>
+        {fmt_loss(@heartbeat.worst_loss)}
+      </.metric>
+    </div>
+  </.card>
+
+  <.card title="Open events" meta={"#{length(@open_events_shown)} of #{@open_alerts_count}"} body_class="tight">
+    <p :if={@open_events == []} class="px-3 py-6 text-center text-sm text-sl-500">
+      No open events. The fleet is clear.
+    </p>
+    <table :if={@open_events != []} class="w-full border-collapse text-sm">
+      <thead>
+        <tr>
+          <.th>Sev</.th>
+          <.th>Agent</.th>
+          <.th>Target</.th>
+          <.th>Metric</.th>
+          <.th>Detectors</.th>
+          <.th num>Findings</.th>
+          <.th>Opened</.th>
+          <.th></.th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr :for={e <- @open_events_shown} class="border-b border-sl-200 last:border-0 hover:bg-canvas-alt">
+          <.td><.sev z={e.peak_severity} /></.td>
+          <.td>
+            <.link navigate={~p"/agents/#{e.serial_id}"} class="font-medium text-encoder-700 hover:underline">
+              {e.serial_id}
+            </.link>
+          </.td>
+          <.td mono>{e.target}</.td>
+          <.td><.metric_chip metric={e.metric} /></.td>
+          <.td><span class="font-mono text-[10px] uppercase text-sl-400">{fmt_detectors(e.detectors)}</span></.td>
+          <.td num mono>{e.finding_count}</.td>
+          <.td mono muted>{fmt_dt(e.opened_at)}</.td>
+          <.td>
+            <.link navigate={~p"/alerts"}>
+              <.icon name="hero-arrow-right" class="size-3.5 text-sl-300" />
+            </.link>
+          </.td>
+        </tr>
+      </tbody>
+    </table>
+  </.card>
+
+  <.card
+    title="Probe paths"
+    meta={"#{length(@probe_paths)} shown · p95 latency, last #{@window}"}
+    body_class="pad"
+  >
+    <p :if={@probe_paths == []} class="text-sm text-sl-500">No STAMP samples in window.</p>
+    <div class="grid grid-cols-2 gap-x-4 gap-y-2 max-[1180px]:grid-cols-1">
+      <.probe_strip :for={p <- @probe_paths} path={p} />
+    </div>
+  </.card>
+
+  <.card title="Agents" meta={"showing #{length(@agents)}"} body_class="tight">
+    <table class="w-full border-collapse text-sm">
+      <thead>
+        <tr>
+          <.th>Agent</.th>
+          <.th num>Targets</.th>
+          <.th>STAMP p95</.th>
+          <.th>Trend</.th>
+          <.th num>Ping p95</.th>
+          <.th num>Loss</.th>
+          <.th num>Open</.th>
+          <.th>Status</.th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          :for={a <- @agents}
+          class="cursor-pointer border-b border-sl-200 last:border-0 hover:bg-canvas-alt"
+          onclick={"window.location='/agents/#{a.serial_id}'"}
+        >
+          <.td>
+            <.link navigate={~p"/agents/#{a.serial_id}"} class="font-medium text-encoder-700 hover:underline">
+              {a.serial_id}
+            </.link>
+          </.td>
+          <.td num mono>{a.targets}</.td>
+          <.td mono>{fmt_rtt(a.stamp_p95_ns)}</.td>
+          <.td>
+            <div class="w-[88px]"><.tick_strip values={a.trend} count={26} mini /></div>
+          </.td>
+          <.td num mono>{fmt_rtt(a.ping_p95_ns)}</.td>
+          <.td num mono muted>{fmt_loss(a.worst_loss)}</.td>
+          <.td num>
+            <span :if={a.open_events > 0} class="font-mono font-semibold text-leak-700">{a.open_events}</span>
+            <span :if={a.open_events == 0} class="text-sl-300">—</span>
+          </.td>
+          <.td><.status_pill status={a.status} /></.td>
+        </tr>
+      </tbody>
+    </table>
+  </.card>
+</Layouts.app>

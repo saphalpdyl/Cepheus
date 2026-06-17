@@ -102,4 +102,80 @@
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
-/* This file is for your main application CSS */
+/* ============================================================================
+   Cepheus design system — tokens lifted from the reference design (tokens.css).
+   Registered as Tailwind v4 theme tokens so the new pages use plain utility
+   classes (bg-paper, text-ink, border-sl-200, text-seu-700, …). The `sl-*`
+   ramp is the reference's cool-slate neutrals (named `sl` to avoid clobbering
+   Tailwind's built-in `slate`).
+   ============================================================================ */
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
+
+  --color-ink: #141A24;
+  --color-paper: #FFFFFF;
+  --color-canvas: #F7F8FA;
+  --color-canvas-alt: #F3F4F6;
+
+  --color-sl-50:  #F7F8FA;
+  --color-sl-100: #F0F1F4;
+  --color-sl-200: #E5E7EB;
+  --color-sl-300: #D5D9E0;
+  --color-sl-400: #B6BCC6;
+  --color-sl-500: #9098A4;
+  --color-sl-600: #6B7280;
+  --color-sl-700: #4B5563;
+  --color-sl-800: #374151;
+  --color-sl-900: #1F2937;
+
+  --color-seu-50:  #ECFDF3;
+  --color-seu-100: #DCFCE7;
+  --color-seu-500: #22C55E;
+  --color-seu-600: #16A34A;
+  --color-seu-700: #15803D;
+
+  --color-encoder-50:  #EFF6FF;
+  --color-encoder-100: #DBEAFE;
+  --color-encoder-600: #2563EB;
+  --color-encoder-700: #1D4ED8;
+
+  --color-leak-50:  #FEF2F2;
+  --color-leak-100: #FEE2E2;
+  --color-leak-600: #DC2626;
+  --color-leak-700: #B91C1C;
+
+  --color-unlearn-50:  #FFF7ED;
+  --color-unlearn-100: #FFEDD5;
+  --color-unlearn-600: #D97706;
+  --color-unlearn-700: #B45309;
+
+  --color-pool-50:  #F5F3FF;
+  --color-pool-100: #EDE9FE;
+  --color-pool-600: #7C3AED;
+  --color-pool-700: #6D28D9;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-canvas);
+    color: var(--color-sl-700);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+}
+
+/* Dotted page canvas (the content background in the reference). */
+.dotted-canvas {
+  background:
+    radial-gradient(circle at 1px 1px, var(--color-sl-200) 1px, transparent 0) 0 0 / 22px 22px,
+    var(--color-canvas);
+}
+
+/* Live "updated" pulse dot. */
+@keyframes cph-pulse { 0% { transform: scale(.6); opacity: .5 } 70% { transform: scale(1.7); opacity: 0 } 100% { opacity: 0 } }
+.live-dot::after {
+  content: ""; position: absolute; inset: -3px; border-radius: 9999px;
+  background: var(--color-seu-500); opacity: .35; animation: cph-pulse 2.4s ease-out infinite;
+}

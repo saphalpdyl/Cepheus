@@ -1,0 +1,315 @@
+<Layouts.app
+  flash={@flash}
+  active_nav={:overview}
+  open_alerts_count={@open_alerts_count}
+  window={@window}
+  windows={@windows}
+>
+  <:breadcrumb>
+    <.link navigate={~p"/"} class="hover:text-ink">Agents</.link>
+    <span class="text-sl-300">/</span>
+    <span class="inline-flex items-center gap-1.5 rounded-[5px] border border-sl-200 px-2 py-0.5 font-medium text-ink">
+      {@device.serial_id}
+      <.pill tone={(@vitals.open_events > 0 && "crit") || "ok"} dot>
+        {(@vitals.open_events > 0 && "Alert") || "Healthy"}
+      </.pill>
+    </span>
+  </:breadcrumb>
+
+  <%!-- header --%>
+  <.card body_class="pad">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="font-mono text-lg font-semibold text-ink">{@device.serial_id}</span>
+      <.pill tone={(@vitals.open_events > 0 && "crit") || "ok"} dot>
+        {(@vitals.open_events > 0 && "Alert") || "Healthy"}
+      </.pill>
+      <span class="font-mono text-xs text-sl-500">
+        · config {short_uuid(@device.agent_config_id)} · {@device.scamper_pps} pps · gen {@device.generation}
+      </span>
+      <div class="ml-auto flex items-center gap-2">
+        <.link
+          :if={@vitals.open_events > 0}
+          navigate={~p"/alerts"}
+          class="inline-flex items-center gap-1.5 rounded-[5px] border border-sl-200 bg-paper px-2.5 py-1 text-xs font-medium text-sl-700 hover:bg-canvas-alt"
+        >
+          <.icon name="hero-exclamation-triangle" class="size-3.5 text-sl-400" /> {@vitals.open_events} open
+        </.link>
+        <.link navigate={~p"/alerts"} class="inline-flex items-center gap-1 text-xs text-sl-600 hover:text-ink">
+          Alerts <.icon name="hero-arrow-right" class="size-3" />
+        </.link>
+      </div>
+    </div>
+  </.card>
+
+  <%!-- vitals + latency chart --%>
+  <div class="grid grid-cols-[232px_1fr] gap-4 max-[1180px]:grid-cols-1">
+    <.card title="Agent vitals" meta={@window}>
+      <div class="flex flex-col gap-3">
+        <.metric label="Active targets" row>{@vitals.targets}</.metric>
+        <.metric label="STAMP p95" tone={rtt_tone(@vitals.stamp_p95_ns)} row>
+          {fmt_rtt(@vitals.stamp_p95_ns)}
+        </.metric>
+        <.metric label="Ping p95" tone={rtt_tone(@vitals.ping_p95_ns)} row>
+          {fmt_rtt(@vitals.ping_p95_ns)}
+        </.metric>
+        <.metric label="Worst loss" tone={loss_tone_for(@vitals.worst_loss)} row>
+          {fmt_loss(@vitals.worst_loss)}
+        </.metric>
+        <.metric label="Open events" tone={(@vitals.open_events > 0 && "crit") || "ok"} row>
+          {@vitals.open_events}
+        </.metric>
+      </div>
+    </.card>
+
+    <.card title="Latency by target" meta={(@chart_metric == "ping" && "ICMP ping p95") || "STAMP round-trip p95"}>
+      <:actions>
+        <div class="flex items-center gap-2">
+          <div class="inline-flex gap-0.5 rounded-md border border-sl-200 bg-canvas-alt p-0.5">
+            <button
+              :for={{m, label} <- [{"rtt", "RTT"}, {"ping", "Ping"}]}
+              type="button"
+              phx-click="set_chart_metric"
+              phx-value-metric={m}
+              class={[
+                "rounded-[3px] px-2 py-0.5 font-mono text-[11px] font-medium",
+                @chart_metric == m && "bg-paper text-ink shadow-sm" || "text-sl-500 hover:text-ink"
+              ]}
+            >
+              {label}
+            </button>
+          </div>
+        </div>
+      </:actions>
+
+      <.target_selector
+        event={(@chart_metric == "ping" && "set_ping_targets") || "set_stamp_targets"}
+        available={(@chart_metric == "ping" && @ping_targets) || @stamp_targets}
+        selected={(@chart_metric == "ping" && @selected_ping_targets) || @selected_stamp_targets}
+      />
+      <div id="latency-chart" phx-hook=".LatencyChart" phx-update="ignore" class="mt-2 h-64 w-full"></div>
+    </.card>
+  </div>
+
+  <script :type={Phoenix.LiveView.ColocatedHook} name=".LatencyChart">
+    import ApexCharts from "apexcharts"
+
+    const options = {
+      chart: { type: "line", height: "100%", background: "transparent", animations: { enabled: false }, toolbar: { show: false }, zoom: { enabled: false } },
+      stroke: { curve: "smooth", width: 1.8 },
+      dataLabels: { enabled: false },
+      legend: { position: "top", horizontalAlign: "right", fontFamily: "IBM Plex Mono, monospace", fontSize: "11px" },
+      grid: { borderColor: "#E5E7EB", strokeDashArray: 3 },
+      colors: ["#16A34A", "#2563EB", "#D97706", "#7C3AED", "#DC2626", "#0E7490", "#4B5563", "#DB2777"],
+      xaxis: { type: "datetime", labels: { datetimeUTC: false, style: { fontFamily: "IBM Plex Mono, monospace" } } },
+      yaxis: { labels: { style: { fontFamily: "IBM Plex Mono, monospace" }, formatter: v => v == null ? "" : (v / 1_000_000).toFixed(2) + " ms" } },
+      tooltip: { x: { format: "HH:mm:ss" }, y: { formatter: v => v == null ? "—" : (v / 1_000_000).toFixed(3) + " ms" } },
+      series: []
+    }
+
+    export default {
+      mounted() {
+        this.chart = new ApexCharts(this.el, options)
+        this.chart.render()
+        this.handleEvent("latency-chart:update", ({ series }) => this.chart.updateSeries(series, true))
+      },
+      destroyed() { this.chart?.destroy() }
+    }
+  </script>
+
+  <%!-- loss — β-binomial posterior --%>
+  <.card
+    title="Loss — β-binomial posterior"
+    meta="mean + 95% credible interval, per probe type"
+    body_class="tight"
+  >
+    <:actions><.detector_badge>Beta-binomial</.detector_badge></:actions>
+    <p :if={@loss_rows == []} class="px-3 py-6 text-center text-sm text-sl-500">No probes in window.</p>
+    <table :if={@loss_rows != []} class="w-full border-collapse text-sm">
+      <thead>
+        <tr>
+          <.th>Target</.th>
+          <.th num>STAMP sent</.th>
+          <.th>STAMP loss</.th>
+          <.th num>Ping sent</.th>
+          <.th>Ping loss</.th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr :for={r <- @loss_rows} class="border-b border-sl-200 last:border-0">
+          <.td mono class="text-ink">{r.target}</.td>
+          <.td num mono muted>{sent_label(r.stamp)}</.td>
+          <.td><.loss_cell model={r.stamp_model} cap={@loss_cap} /></.td>
+          <.td num mono muted>{sent_label(r.ping)}</.td>
+          <.td><.loss_cell model={r.ping_model} cap={@loss_cap} /></.td>
+        </tr>
+      </tbody>
+    </table>
+  </.card>
+
+  <%!-- STAMP targets --%>
+  <.card title="STAMP targets" meta={"last #{@window}"} body_class="tight">
+    <p :if={@summary == []} class="px-3 py-6 text-center text-sm text-sl-500">No samples in window.</p>
+    <table :if={@summary != []} class="w-full border-collapse text-sm">
+      <thead>
+        <tr>
+          <.th>Target</.th>
+          <.th num>Probes</.th>
+          <.th num>Avg p95</.th>
+          <.th num>Max p95</.th>
+          <.th num>Avg fwd</.th>
+          <.th num>Avg bwd</.th>
+          <.th num>Ping p95</.th>
+          <.th num>Batches</.th>
+          <.th>Last seen</.th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr :for={r <- @summary} class="border-b border-sl-200 last:border-0">
+          <.td mono class="text-ink">{r.target}</.td>
+          <.td num mono muted>{r.received}/{r.sent}</.td>
+          <.td num mono class="text-ink">{fmt_rtt(r.avg_rtt_p95_ns)}</.td>
+          <.td num mono>{fmt_rtt(r.max_rtt_p95_ns)}</.td>
+          <.td num mono>{fmt_rtt(r.avg_fwd_p95_ns)}</.td>
+          <.td num mono>{fmt_rtt(r.avg_bwd_p95_ns)}</.td>
+          <.td num mono>{fmt_rtt(ping_p95(@ping_by_target, r.target))}</.td>
+          <.td num mono>{r.measurements}</.td>
+          <.td mono muted>{fmt_ago(r.last_seen)}</.td>
+        </tr>
+      </tbody>
+    </table>
+  </.card>
+
+  <%!-- detection events --%>
+  <.card
+    title="Detection events"
+    meta={"#{Enum.count(@events, &(&1.status == "open"))} open · #{length(@events)} in window"}
+    body_class="tight"
+  >
+    <p :if={@events == []} class="px-3 py-6 text-center text-sm text-sl-500">No events in window.</p>
+    <table :if={@events != []} class="w-full border-collapse text-sm">
+      <thead>
+        <tr>
+          <.th>Status</.th>
+          <.th>Target</.th>
+          <.th>Metric</.th>
+          <.th>Detectors</.th>
+          <.th>Peak sev</.th>
+          <.th num>Findings</.th>
+          <.th>Opened</.th>
+          <.th>Closed</.th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr :for={e <- @events} class="border-b border-sl-200 last:border-0 hover:bg-canvas-alt">
+          <.td><.event_badge status={e.display_status} /></.td>
+          <.td mono class="text-ink">{e.target}</.td>
+          <.td><.metric_chip metric={e.metric} /></.td>
+          <.td><span class="font-mono text-[10px] uppercase text-sl-400">{fmt_detectors(e.detectors)}</span></.td>
+          <.td><.sev z={e.peak_severity} /></.td>
+          <.td num mono>{e.finding_count}</.td>
+          <.td mono muted>{fmt_dt(e.opened_at)}</.td>
+          <.td mono muted>{(e.closed_at && fmt_dt(e.closed_at)) || "—"}</.td>
+        </tr>
+      </tbody>
+    </table>
+  </.card>
+
+  <%!-- recent findings (expandable) --%>
+  <.card
+    title="Recent findings"
+    meta="STAMP / Ping latency · expand for per-sample detail"
+    body_class="tight"
+  >
+    <p :if={@findings == []} class="px-3 py-6 text-center text-sm text-sl-500">No findings in window.</p>
+    <table :if={@findings != []} class="w-full border-collapse text-sm">
+      <thead>
+        <tr>
+          <.th class="w-6"></.th>
+          <.th>Target</.th>
+          <.th>Metric</.th>
+          <.th>Detector</.th>
+          <.th num>Samples</.th>
+          <.th>Trend</.th>
+          <.th num>Latest sev</.th>
+          <.th>Latest</.th>
+          <.th>Peak</.th>
+        </tr>
+      </thead>
+      <tbody :for={g <- group_findings(@findings, @expanded_findings)}>
+        <tr
+          class="cursor-pointer border-b border-sl-200 hover:bg-canvas-alt"
+          phx-click="toggle_finding_group"
+          phx-value-key={g.key}
+        >
+          <.td>
+            <.icon
+              name="hero-chevron-right"
+              class={["size-3.5 text-sl-400 transition-transform", g.expanded && "rotate-90"]}
+            />
+          </.td>
+          <.td mono class="text-ink">{g.target}</.td>
+          <.td><.metric_chip metric={g.metric} /></.td>
+          <.td><span class="font-mono text-[10px] uppercase text-sl-400">{g.detector}</span></.td>
+          <.td num mono>{g.count}</.td>
+          <.td><div class="w-[100px]"><.tick_strip values={g.trend} count={28} mini /></div></.td>
+          <.td num><.sev z={g.latest_z} /></.td>
+          <.td mono muted>{fmt_ago(g.latest_ts)}</.td>
+          <.td><.sev z={g.peak_severity} /></.td>
+        </tr>
+        <tr :if={g.expanded} class="border-b border-sl-200">
+          <td colspan="9" class="bg-canvas-alt p-0">
+            <div class="px-4 py-3">
+              <table class="w-full border-collapse text-[11px]">
+                <thead>
+                  <tr>
+                    <.th>Timestamp</.th>
+                    <.th num>Value</.th>
+                    <.th num>Severity</.th>
+                    <.th>Details</.th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr :for={f <- g.findings} class="border-b border-sl-200 last:border-0">
+                    <.td mono muted>{fmt_dt(f.ts)}</.td>
+                    <.td num mono>{fmt_num(f.value)}</.td>
+                    <.td num><.sev z={f.severity} /></.td>
+                    <.td mono muted class="max-w-[480px] truncate" title={f.details}>{trunc_details(f.details)}</.td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </.card>
+
+  <%!-- existing tasks + probe-task editor --%>
+  <.card title="Probe tasks" meta={"#{length(@tasks)} configured"} body_class="tight">
+    <p :if={@tasks == []} class="px-3 py-6 text-center text-sm text-sl-500">No tasks configured.</p>
+    <table :if={@tasks != []} class="w-full border-collapse text-sm">
+      <thead>
+        <tr>
+          <.th>Task</.th>
+          <.th>Type</.th>
+          <.th>Target</.th>
+          <.th num>Interval</.th>
+          <.th>Enabled</.th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr :for={t <- @tasks} class="border-b border-sl-200 last:border-0">
+          <.td mono class="text-ink">{t.task_id}</.td>
+          <.td mono muted>{t.type}</.td>
+          <.td mono>{Map.get(t.params, "target", "—")}</.td>
+          <.td num mono>{(t.schedule_enabled && "#{t.schedule_interval_seconds}s") || "—"}</.td>
+          <.td>
+            <.pill tone={(t.enabled && "ok") || "neutral"} dot>{(t.enabled && "on") || "off"}</.pill>
+          </.td>
+        </tr>
+      </tbody>
+    </table>
+  </.card>
+
+  <.task_form rows={@task_rows} tasks={@tasks} />
+</Layouts.app>
