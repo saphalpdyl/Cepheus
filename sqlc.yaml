@@ -38,6 +38,8 @@ sql:
     queries: "db/queries/argus/"
     schema:
       - "db/init/02-stamp.sql"
+      - "db/init/03-trace.sql"
+      - "db/init/08-ping.sql"
       - "db/init/07-argus.sql"
     gen:
       go:

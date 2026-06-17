@@ -5,11 +5,14 @@
 package argus_db
 
 import (
+	"net/netip"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ArgusBaseline struct {
 	SerialID  string
+	SrcIp     string
 	Target    string
 	Port      int32
 	Metric    string
@@ -52,6 +55,7 @@ type ArgusFinding struct {
 
 type ArgusPolicyState struct {
 	SerialID        string
+	SrcIp           string
 	Target          string
 	Port            int32
 	Metric          string
@@ -63,6 +67,32 @@ type ArgusPolicyState struct {
 	PendingFindings []pgtype.UUID
 	EnteredStatusAt pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+}
+
+type PingMeasurement struct {
+	ID            pgtype.UUID
+	Timestamp     pgtype.Timestamptz
+	SerialID      string
+	AgentConfigID pgtype.UUID
+	Target        string
+	Sent          int32
+	Received      int32
+	Loss          float64
+	RttMinNs      int64
+	RttAvgNs      int64
+	RttMaxNs      int64
+	RttP50Ns      int64
+	RttP95Ns      int64
+	RttStddevNs   int64
+}
+
+type PingProbe struct {
+	MeasurementID pgtype.UUID
+	Tx            pgtype.Timestamptz
+	Rx            pgtype.Timestamptz
+	IsLost        bool
+	Seq           pgtype.Int4
+	Rtt           pgtype.Int8
 }
 
 type StampMeasurement struct {
@@ -88,4 +118,45 @@ type StampProbe struct {
 	Rtt           pgtype.Int8
 	ForwardDelay  pgtype.Int8
 	BackwardDelay pgtype.Int8
+}
+
+type TraceHop struct {
+	Timestamp     pgtype.Timestamptz
+	MeasurementID pgtype.UUID
+	Ip            *netip.Addr
+	Ttl           int32
+	Rtt           pgtype.Int8
+	IcmpType      pgtype.Int4
+	IcmpCode      pgtype.Int4
+	ReplyTtl      pgtype.Int4
+	Asn           pgtype.Int4
+	IsNoHop       bool
+}
+
+type TraceLink struct {
+	Timestamp     pgtype.Timestamptz
+	MeasurementID pgtype.UUID
+	ProbeID       int32
+	SrcIp         *netip.Addr
+	DstIp         *netip.Addr
+	TtlGap        int32
+	DiffRtt       pgtype.Float8
+	IsSrcRespond  bool
+	IsDstRespond  bool
+}
+
+type TraceMeasurement struct {
+	ID            pgtype.UUID
+	SerialID      string
+	AgentConfigID pgtype.UUID
+	Timestamp     pgtype.Timestamptz
+	Type          string
+	Src           netip.Addr
+	Dst           netip.Addr
+	Method        string
+	StopReason    string
+	HopCount      int32
+	AsnPathHash   string
+	LinkPathHash  string
+	Raw           []byte
 }

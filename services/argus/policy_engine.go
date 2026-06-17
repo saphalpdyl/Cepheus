@@ -133,7 +133,7 @@ func (p *PolicyEngine) Sweep(ctx context.Context) error {
 			Target:   pRaw.Target,
 			Port:     pRaw.Port,
 			Metric:   pRaw.Metric,
-			Detector: pRaw.Detector,
+			Detector: types.DetectorType(pRaw.Detector),
 		}
 
 		_, ok := p.states[seriesKey]
@@ -185,6 +185,9 @@ func (p *PolicyEngine) Sweep(ctx context.Context) error {
 				state.Status = PolicyStateStatusClean
 				state.PendingFindings = make([]*PendingFinding, 0)
 				state.StatusUpdatedAt = now
+				// Reset the bucket so the next watching cycle starts from a clean
+				// slate; otherwise a leftover score biases the next open decision.
+				state.BucketState = BucketState{Score: 0, ScoreUpdatedAt: now}
 			}
 		case PolicyStateStatusFiring:
 			if updateState.CrossedClose {
@@ -231,7 +234,7 @@ func (p *PolicyEngine) InsertFinding(ctx context.Context, seriesKey types.Series
 		Target:   seriesKey.Target,
 		Port:     seriesKey.Port,
 		Metric:   seriesKey.Metric,
-		Detector: seriesKey.Detector,
+		Detector: string(seriesKey.Detector),
 		Ts: pgtype.Timestamptz{
 			Time:  finding.TS,
 			Valid: true,
@@ -263,10 +266,11 @@ func (p *PolicyEngine) ApplyFinding(ctx context.Context, seriesKey types.SeriesK
 	if !ok {
 		stateRaw, err := p.query.GetPolicyState(ctx, argus_db.GetPolicyStateParams{
 			SerialID: seriesKey.SerialId,
+			SrcIp:    seriesKey.SrcIP,
 			Target:   seriesKey.Target,
 			Port:     seriesKey.Port,
 			Metric:   seriesKey.Metric,
-			Detector: seriesKey.Detector,
+			Detector: string(seriesKey.Detector),
 		})
 
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -335,80 +339,24 @@ func (p *PolicyEngine) ApplyFinding(ctx context.Context, seriesKey types.SeriesK
 			},
 		}
 
+		// A single finding can clear OpenThreshold in one step. CrossedOpen is a
+		// rising edge, so it must be checked on this transition too; otherwise the
+		// score parks above the threshold and the edge can never fire again.
+		if updateState.CrossedOpen {
+			if err := p.openEvent(ctx, seriesKey, state, finding); err != nil {
+				return err
+			}
+		}
+
 	case PolicyStateStatusWatching:
 		state.PendingFindings = append(state.PendingFindings, &PendingFinding{
 			Id:      findingId.String(),
 			Finding: finding,
 		})
 		if updateState.CrossedOpen {
-			// Threshold crossed; fire event
-			p.logger.DebugContext(ctx, "transitioning state watching -> firing")
-			tx, err := p.transactionGenerator(ctx)
-			if err != nil {
-				p.logger.ErrorContext(ctx, "failed to generate transaction", log.Err(err))
-				_ = tx.Rollback(ctx)
+			if err := p.openEvent(ctx, seriesKey, state, finding); err != nil {
 				return err
 			}
-
-			peakSeverity := finding.Severity
-			for _, pf := range state.PendingFindings {
-				if pf.Finding != nil && pf.Finding.Severity > peakSeverity {
-					peakSeverity = pf.Finding.Severity
-				}
-			}
-
-			event, err := p.query.WithTx(tx).OpenEvent(ctx, argus_db.OpenEventParams{
-				SerialID:     seriesKey.SerialId,
-				Target:       seriesKey.Target,
-				Port:         seriesKey.Port,
-				Metric:       seriesKey.Metric,
-				OpenedAt:     pgtype.Timestamptz{Time: finding.TS, Valid: true},
-				FindingCount: int32(len(state.PendingFindings)),
-				PeakSeverity: peakSeverity,
-				Detectors:    []string{"ewma"},
-			})
-			if err != nil {
-				p.logger.ErrorContext(ctx, "failed to open event", log.Err(err))
-				_ = tx.Rollback(ctx)
-				return err
-			}
-
-			for _, finding := range state.PendingFindings {
-				findingIdParsed, err := uuid.Parse(finding.Id)
-				if err != nil {
-					p.logger.ErrorContext(ctx, "failed to parse finding", log.Err(err))
-					_ = tx.Rollback(ctx)
-					return err
-				}
-
-				err = p.query.WithTx(tx).AttachFindingToEvent(ctx, argus_db.AttachFindingToEventParams{
-					EventID: pgtype.UUID{Bytes: event.Bytes, Valid: true},
-					ID:      pgtype.UUID{Bytes: findingIdParsed, Valid: true},
-				})
-				if err != nil {
-					p.logger.ErrorContext(ctx, "failed to attach finding", log.Err(err))
-					_ = tx.Rollback(ctx)
-					return err
-				}
-			}
-
-			uuidValue, err := uuid.Parse(event.String())
-			if err != nil {
-				p.logger.ErrorContext(ctx, "failed to parse uuid", log.Err(err))
-				_ = tx.Rollback(ctx)
-				return err
-			}
-
-			err = tx.Commit(ctx)
-			if err != nil {
-				p.logger.ErrorContext(ctx, "failed to commit transaction", log.Err(err))
-				return err
-			}
-
-			state.Status = PolicyStateStatusFiring
-			state.OpenEventId = &uuidValue
-			state.PendingFindings = make([]*PendingFinding, 0)
-			state.StatusUpdatedAt = finding.TS
 		}
 	case PolicyStateStatusFiring:
 		if state.OpenEventId == nil {
@@ -440,6 +388,81 @@ func (p *PolicyEngine) ApplyFinding(ctx context.Context, seriesKey types.SeriesK
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// openEvent opens an event for the series, attaches every pending finding to it,
+// and transitions the state to FIRING. It assumes the caller has already added
+// the triggering finding to state.PendingFindings and confirmed CrossedOpen.
+func (p *PolicyEngine) openEvent(ctx context.Context, seriesKey types.SeriesKey, state *PolicyState, finding *types.Finding) error {
+	p.logger.DebugContext(ctx, "transitioning state watching -> firing")
+	tx, err := p.transactionGenerator(ctx)
+	if err != nil {
+		p.logger.ErrorContext(ctx, "failed to generate transaction", log.Err(err))
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	peakSeverity := finding.Severity
+	for _, pf := range state.PendingFindings {
+		if pf.Finding != nil && pf.Finding.Severity > peakSeverity {
+			peakSeverity = pf.Finding.Severity
+		}
+	}
+
+	event, err := p.query.WithTx(tx).OpenEvent(ctx, argus_db.OpenEventParams{
+		SerialID:     seriesKey.SerialId,
+		Target:       seriesKey.Target,
+		Port:         seriesKey.Port,
+		Metric:       seriesKey.Metric,
+		OpenedAt:     pgtype.Timestamptz{Time: finding.TS, Valid: true},
+		FindingCount: int32(len(state.PendingFindings)),
+		PeakSeverity: peakSeverity,
+		Detectors:    []string{string(seriesKey.Detector)},
+	})
+	if err != nil {
+		p.logger.ErrorContext(ctx, "failed to open event", log.Err(err))
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	for _, pf := range state.PendingFindings {
+		findingIdParsed, err := uuid.Parse(pf.Id)
+		if err != nil {
+			p.logger.ErrorContext(ctx, "failed to parse finding", log.Err(err))
+			_ = tx.Rollback(ctx)
+			return err
+		}
+
+		err = p.query.WithTx(tx).AttachFindingToEvent(ctx, argus_db.AttachFindingToEventParams{
+			EventID: pgtype.UUID{Bytes: event.Bytes, Valid: true},
+			ID:      pgtype.UUID{Bytes: findingIdParsed, Valid: true},
+		})
+		if err != nil {
+			p.logger.ErrorContext(ctx, "failed to attach finding", log.Err(err))
+			_ = tx.Rollback(ctx)
+			return err
+		}
+	}
+
+	uuidValue, err := uuid.Parse(event.String())
+	if err != nil {
+		p.logger.ErrorContext(ctx, "failed to parse uuid", log.Err(err))
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		p.logger.ErrorContext(ctx, "failed to commit transaction", log.Err(err))
+		return err
+	}
+
+	state.Status = PolicyStateStatusFiring
+	state.OpenEventId = &uuidValue
+	state.PendingFindings = make([]*PendingFinding, 0)
+	state.StatusUpdatedAt = finding.TS
 
 	return nil
 }
@@ -476,10 +499,11 @@ func (p *PolicyEngine) savePolicyState(ctx context.Context, seriesKey types.Seri
 
 	err := p.query.UpsertPolicyState(ctx, argus_db.UpsertPolicyStateParams{
 		SerialID: seriesKey.SerialId,
+		SrcIp:    seriesKey.SrcIP,
 		Target:   seriesKey.Target,
 		Port:     seriesKey.Port,
 		Metric:   seriesKey.Metric,
-		Detector: seriesKey.Detector,
+		Detector: string(seriesKey.Detector),
 		Status:   string(state.Status),
 		Score:    state.BucketState.Score,
 		ScoreUpdatedAt: pgtype.Timestamptz{

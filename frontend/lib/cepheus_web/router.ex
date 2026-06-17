@@ -17,7 +17,9 @@ defmodule CepheusWeb.Router do
   scope "/", CepheusWeb do
     pipe_through :browser
 
-    live "/", DashboardLive, :index
-    live "/devices/:serial_id", DashboardLive, :show
+    live "/", FleetLive, :index
+    live "/agents/:serial_id", DeviceLive, :show
+    live "/alerts", AlertsLive, :index
+    live "/agents", AgentsLive, :agents
   end
 end

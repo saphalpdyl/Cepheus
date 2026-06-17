@@ -38,7 +38,8 @@ type BucketUpdate struct {
 func (b *LeakyBucket) Add(state BucketState, value float64, ts time.Time) BucketUpdate {
 	elapsed := ts.Sub(state.ScoreUpdatedAt).Seconds()
 	decayed := math.Max(0, state.Score-b.cfg.DecayPerSecond*elapsed)
-	contribution := b.cfg.BaseContribution + b.cfg.MagnitudeAlpha*math.Log10(1.0+math.Abs(value))
+	// contribution := b.cfg.BaseContribution + b.cfg.MagnitudeAlpha*math.Log10(1.0+math.Abs(value))
+	contribution := math.Abs(value)
 	newScore := decayed + contribution
 
 	return BucketUpdate{

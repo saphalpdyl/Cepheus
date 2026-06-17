@@ -27,6 +27,7 @@ Although the development environment is developer-friendly and reproducible, the
 
 Once that is formed, the project will welcome contributors.
 
-### Screenshots ( prototype )
-![First screenshot](/docs/images/screenshots/prototype/scrn1.png)
-![Second screenshot](/docs/images/screenshots/prototype/scrn2.png)
+### Screenshots
+![Fleet Overview](/docs/images/screenshots/redesign/fleet.png)
+![Per-device dashboard](/docs/images/screenshots/redesign/per_device.png)
+![Alerts Overview](/docs/images/screenshots/redesign/alerts.png)

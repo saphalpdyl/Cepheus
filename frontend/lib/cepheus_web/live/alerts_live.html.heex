@@ -1,0 +1,119 @@
+<Layouts.app
+  flash={@flash}
+  active_nav={:alerts}
+  open_alerts_count={@open_alerts_count}
+  show_window={false}
+  window={@window}
+  windows={@windows}
+>
+  <:breadcrumb>
+    <.link navigate={~p"/"} class="hover:text-ink">Insights</.link>
+    <span class="text-sl-300">/</span>
+    <span class="font-medium text-ink">Alerts</span>
+  </:breadcrumb>
+
+  <div class="flex flex-wrap items-center gap-3">
+    <h1 class="text-base font-semibold text-ink">Alerts</h1>
+    <span class="text-xs text-sl-500">{@open_count} open · {length(@events)} in window</span>
+
+    <div class="ml-auto flex flex-wrap items-center gap-2">
+      <form phx-change="search" class="flex items-center gap-1.5 rounded-[5px] border border-sl-200 bg-paper px-2 py-1.5 text-sl-400">
+        <.icon name="hero-magnifying-glass" class="size-3.5" />
+        <input
+          type="text"
+          name="q"
+          value={@query}
+          placeholder="Filter agent, target, metric…"
+          phx-debounce="200"
+          autocomplete="off"
+          class="w-44 border-0 bg-transparent p-0 text-sm text-ink outline-none focus:ring-0"
+        />
+      </form>
+
+      <div class="inline-flex gap-0.5 rounded-md border border-sl-200 bg-canvas-alt p-0.5">
+        <button
+          :for={{v, l} <- [{"all", "All"}, {"open", "Open"}, {"resolved", "Resolved"}]}
+          type="button"
+          phx-click="filter_status"
+          phx-value-value={v}
+          class={[
+            "rounded-[3px] px-2 py-0.5 font-mono text-[11px] font-medium",
+            @status_filter == v && "bg-paper text-ink shadow-sm" || "text-sl-500 hover:text-ink"
+          ]}
+        >
+          {l}
+        </button>
+      </div>
+
+      <div class="inline-flex gap-0.5 rounded-md border border-sl-200 bg-canvas-alt p-0.5">
+        <button
+          :for={{v, l} <- [{"all", "Any"}, {"watch", "Watch"}, {"warn", "Warn"}, {"crit", "Crit"}]}
+          type="button"
+          phx-click="filter_sev"
+          phx-value-value={v}
+          class={[
+            "rounded-[3px] px-2 py-0.5 font-mono text-[11px] font-medium",
+            @sev_filter == v && "bg-paper text-ink shadow-sm" || "text-sl-500 hover:text-ink"
+          ]}
+        >
+          {l}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-[1fr_336px] items-start gap-4 max-[1180px]:grid-cols-1">
+    <.card title="Detection events" meta={"#{length(@filtered)} shown"} body_class="tight">
+      <table class="w-full border-collapse text-sm">
+        <thead>
+          <tr>
+            <.th>Sev</.th>
+            <.th>Status</.th>
+            <.th>Agent</.th>
+            <.th>Target</.th>
+            <.th>Metric</.th>
+            <.th>Detectors</.th>
+            <.th num>Findings</.th>
+            <.th>Opened</.th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            :for={e <- @filtered}
+            class={[
+              "cursor-pointer border-b border-sl-200 last:border-0 hover:bg-canvas-alt",
+              e.id == @selected_event_id && "bg-encoder-50 shadow-[inset_2px_0_0_var(--color-encoder-600)]"
+            ]}
+            phx-click="select_event"
+            phx-value-id={e.id}
+          >
+            <.td><.sev z={e.peak_severity} /></.td>
+            <.td><.event_badge status={e.display_status} /></.td>
+            <.td>
+              <.link navigate={~p"/agents/#{e.serial_id}"} class="font-medium text-encoder-700 hover:underline">
+                {e.serial_id}
+              </.link>
+            </.td>
+            <.td mono class="text-ink">{e.target}</.td>
+            <.td><.metric_chip metric={e.metric} /></.td>
+            <.td><span class="font-mono text-[10px] uppercase text-sl-400">{fmt_detectors(e.detectors)}</span></.td>
+            <.td num mono>{e.finding_count}</.td>
+            <.td mono muted>{fmt_dt(e.opened_at)}</.td>
+          </tr>
+          <tr :if={@filtered == []}>
+            <td colspan="8" class="px-3 py-6 text-center text-sm text-sl-500">
+              No events match these filters.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </.card>
+
+    <div class="sticky top-4">
+      <.alert_detail :if={@detail} detail={@detail} />
+      <.card :if={@detail == nil} body_class="pad">
+        <p class="text-sm text-sl-500">Select an event to triage.</p>
+      </.card>
+    </div>
+  </div>
+</Layouts.app>
