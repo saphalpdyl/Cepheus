@@ -385,9 +385,9 @@ defmodule CepheusWeb.CepheusComponents do
     <div class={[
       "flex items-stretch gap-px",
       @mini && "h-[18px]" ||
-        "h-[30px] rounded-md border border-sl-200 bg-canvas-alt px-1.5 py-1 flex flex-row justify-between"
+        "h-[30px] rounded-md border border-sl-200 bg-canvas-alt px-1.5 py-1 flex flex-row justify-around"
     ]}>
-      <span :for={{tone, i} <- Enum.with_index(@tones)} class={["min-w-0 max-w-[3px] flex-1 rounded-[3px]", tick_class(tone)]} key={i}>
+      <span :for={{tone, i} <- Enum.with_index(@tones)} class={["min-w-[3px] max-w-[3px] flex-1 rounded-[3px]", tick_class(tone)]} key={i}>
       </span>
     </div>
     """
