@@ -39,10 +39,10 @@ defmodule CepheusWeb.Layouts do
     <div class="grid min-h-screen grid-cols-[230px_1fr] max-[1180px]:grid-cols-1">
       <aside class="sticky top-0 flex h-screen flex-col overflow-y-auto border-r border-sl-200 bg-paper max-[1180px]:static max-[1180px]:h-auto">
         <div class="flex items-center gap-2 border-b border-sl-200 px-3 py-3">
-          <.cepheus_mark size={} />
+          <.cepheus_mark size={200} />
         </div>
 
-        <nav class="flex flex-col gap-px px-2 pb-4">
+        <nav class="flex flex-col gap-px px-2 pb-4 mt-2">
           <.nav_item navigate={~p"/"} icon="hero-squares-2x2" active={@active_nav == :overview}>
             Overview
           </.nav_item>
@@ -53,8 +53,8 @@ defmodule CepheusWeb.Layouts do
           <.nav_item navigate={~p"/alerts"} icon="hero-exclamation-triangle" active={@active_nav == :alerts} count={@open_alerts_count}>
             Alerts
           </.nav_item>
-          <.nav_item navigate={~p"/alerts"} icon="hero-document-text" active={@active_nav == :findings}>
-            Findings
+          <.nav_item navigate={~p"/agents"} icon="hero-cpu-chip">
+            Agents
           </.nav_item>
         </nav>
       </aside>

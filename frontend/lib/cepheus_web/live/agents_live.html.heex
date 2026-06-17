@@ -1,0 +1,73 @@
+<Layouts.app
+    flash={@flash}
+    active_nav={:agents}
+    window={@window}
+    windows={@windows}
+    show_window={false}
+>
+    <:breadcrumb>
+        <.link navigate={~p"/"} class="hover:text-ink">Insights</.link>
+        <span class="text-sl-300">/</span>
+        <span class="font-medium text-ink">Agents</span>
+    </:breadcrumb>
+
+    <div class="flex gap-2">
+        <h1 class="text-base font-semibold text-ink">Agents</h1>
+        <div class="ml-auto flex flex-wrap items-center gap-2">
+            <form phx-change="search" class="flex items-center gap-1.5 rounded-[5px] border border-sl-200 bg-paper px-2 py-1.5 text-sl-400">
+                <.icon name="hero-magnifying-glass" class="size-3.5" />
+                <input
+                type="text"
+                name="q"
+                value={@query}
+                placeholder="Filter agent by name..."
+                phx-debounce="200"
+                autocomplete="off"
+                class="w-96 border-0 bg-transparent p-0 text-sm text-ink outline-none focus:ring-0"
+                />
+            </form>
+        </div>
+    </div>
+
+    <.card title="Agents" meta={"showing #{length(@filtered)} of #{length(@agents)}"} body_class="tight">
+        <table class="w-full border-collapse text-sm">
+        <thead>
+            <tr>
+            <.th>Agent</.th>
+            <.th num>Targets</.th>
+            <.th>STAMP p95</.th>
+            <.th>Trend</.th>
+            <.th num>Ping p95</.th>
+            <.th num>Loss</.th>
+            <.th num>Open</.th>
+            <.th>Status</.th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr
+            :for={a <- @filtered}
+            class="cursor-pointer border-b border-sl-200 last:border-0 hover:bg-canvas-alt"
+            onclick={"window.location='/agents/#{a.serial_id}'"}
+            >
+            <.td>
+                <.link navigate={~p"/agents/#{a.serial_id}"} class="font-medium text-encoder-700 hover:underline">
+                {a.serial_id}
+                </.link>
+            </.td>
+            <.td num mono>{a.targets}</.td>
+            <.td mono>{fmt_rtt(a.stamp_p95_ns)}</.td>
+            <.td>
+                <div class="w-[88px]"><.tick_strip values={a.trend} count={26} mini /></div>
+            </.td>
+            <.td num mono>{fmt_rtt(a.ping_p95_ns)}</.td>
+            <.td num mono muted>{fmt_loss(a.worst_loss)}</.td>
+            <.td num>
+                <span :if={a.open_events > 0} class="font-mono font-semibold text-leak-700">{a.open_events}</span>
+                <span :if={a.open_events == 0} class="text-sl-300">—</span>
+            </.td>
+            <.td><.status_pill status={a.status} /></.td>
+            </tr>
+        </tbody>
+        </table>
+  </.card>
+</Layouts.app>

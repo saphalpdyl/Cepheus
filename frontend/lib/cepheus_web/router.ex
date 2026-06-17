@@ -20,5 +20,6 @@ defmodule CepheusWeb.Router do
     live "/", FleetLive, :index
     live "/agents/:serial_id", DeviceLive, :show
     live "/alerts", AlertsLive, :index
+    live "/agents", AgentsLive, :agents
   end
 end
