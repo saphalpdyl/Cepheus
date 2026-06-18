@@ -10,7 +10,6 @@
 package log
 
 import (
-	"cepheus/api"
 	"log/slog"
 )
 
@@ -30,9 +29,9 @@ func Domain(v LogDomain) slog.Attr { return slog.String("domain", string(v)) }
 
 // ── Identity ────────────────────────────────────────────────────────────
 
-func InstanceID(v string) slog.Attr          { return slog.String("service.instance.id", v) }
-func SerialID(v string) slog.Attr            { return slog.String("serial_id", v) }
-func Executor(v api.AgentTaskType) slog.Attr { return slog.String("executor", string(v)) }
+func InstanceID(v string) slog.Attr { return slog.String("service.instance.id", v) }
+func SerialID(v string) slog.Attr   { return slog.String("serial_id", v) }
+func Executor(v string) slog.Attr   { return slog.String("executor", v) }
 
 // ── Operational ─────────────────────────────────────────────────────────
 

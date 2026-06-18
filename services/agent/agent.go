@@ -1,22 +1,20 @@
 package agent
 
 import (
-	"cepheus/api"
+	agentv1 "cepheus/libs/api/gen/cepheus/agent/v1"
+	"cepheus/libs/api/gen/cepheus/agent/v1/agentv1connect"
 	goscamper "cepheus/libs/scamper-client"
 	"cepheus/libs/stamp"
 	"cepheus/libs/telemetry"
 	"cepheus/services/agent/log"
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/avast/retry-go"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -37,14 +35,15 @@ type Agent struct {
 	lastConfigurationPulled time.Time
 
 	mu          sync.RWMutex
-	agentConfig *api.AgentConfig
+	agentConfig *AgentConfig
 
 	// initial configuration
 	scamperBinPath string
 
 	logger *slog.Logger
 
-	httpClient *http.Client
+	// configClient is the Connect client to the control plane's AgentConfigService.
+	configClient agentv1connect.AgentConfigServiceClient
 }
 
 type AgentInitConfig struct {
@@ -56,6 +55,14 @@ type AgentInitConfig struct {
 }
 
 func NewAgent(cfg AgentInitConfig) *Agent {
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives:     true,
+			ResponseHeaderTimeout: 10 * time.Second,
+		},
+	}
+
 	return &Agent{
 		SerialId:           cfg.SerialId,
 		generation:         0,
@@ -63,6 +70,12 @@ func NewAgent(cfg AgentInitConfig) *Agent {
 		logger:             cfg.Logger,
 		scamperBinPath:     cfg.ScamperBinPath,
 		probeDataStream:    NewProbeDataStream(100),
+		// Connect derives the route from the service/method, so only the base URL
+		// of the control plane is needed here.
+		configClient: agentv1connect.NewAgentConfigServiceClient(
+			httpClient,
+			cfg.ControlPlaneConfig.ControlPlane.URL,
+		),
 	}
 }
 
@@ -173,22 +186,22 @@ func (a *Agent) Run(ctx context.Context) (err error) {
 		Scamper:         scamper,
 		Logger:          a.logger,
 		ProbeDataStream: a.probeDataStream,
-		Executors: map[api.AgentTaskType]Executor{
-			api.TaskTypeStampSender: NewStampSenderExecutor(
+		Executors: map[TaskType]Executor{
+			TaskTypeStampSender: NewStampSenderExecutor(
 				stampConfig,
-				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypeStampSender)),
+				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(string(TaskTypeStampSender))),
 			),
-			api.TaskTypeStampReflector: NewStampReflectorExecutor(
+			TaskTypeStampReflector: NewStampReflectorExecutor(
 				stampConfig,
-				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypeStampReflector)),
+				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(string(TaskTypeStampReflector))),
 			),
-			api.TaskTypeTrace: NewTraceExecutor(
+			TaskTypeTrace: NewTraceExecutor(
 				scamper,
-				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypeTrace)),
+				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(string(TaskTypeTrace))),
 			),
-			api.TaskTypePing: NewPingExecutor(
+			TaskTypePing: NewPingExecutor(
 				scamper,
-				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(api.TaskTypePing)),
+				a.logger.With(log.Domain(log.DomainProbeExecutor), log.Executor(string(TaskTypePing))),
 			),
 		},
 	})
@@ -230,7 +243,7 @@ func (a *Agent) pullAgentConfiguration(ctx context.Context) error {
 	ctx, end, span := telemetry.SpanWithErr(ctx, "Agent.pullAgentConfiguration", nil)
 	defer end()
 
-	var agentConfig *api.AgentConfig
+	var agentConfig *AgentConfig
 
 	err := retry.Do(
 		func() error {
@@ -263,57 +276,25 @@ func (a *Agent) pullAgentConfiguration(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) pullConfiguration(ctx context.Context) (config *api.AgentConfig, err error) {
+func (a *Agent) pullConfiguration(ctx context.Context) (config *AgentConfig, err error) {
 	ctx, end, _ := telemetry.SpanWithErr(ctx, "Agent.PullConfiguration", &err)
 	defer end()
 
-	configUrl, err := url.JoinPath(a.controlPlaneConfig.ControlPlane.URL, a.controlPlaneConfig.ControlPlane.ConfigEndpoint, a.SerialId)
-	if err != nil {
-		a.logger.Error("failed to join path for config URL", log.Err(err))
-		return nil, err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, configUrl, nil)
-	if err != nil {
-		a.logger.Error("failed to create request", log.Err(err))
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	if a.httpClient == nil {
-		a.httpClient = &http.Client{
-			Timeout: 10 * time.Second,
-			Transport: &http.Transport{
-				DisableKeepAlives:     true,
-				ResponseHeaderTimeout: 10 * time.Second,
-			},
-		}
-	}
-
-	resp, err := a.httpClient.Do(req)
+	resp, err := a.configClient.GetAgentConfig(ctx, connect.NewRequest(&agentv1.GetAgentConfigRequest{
+		SerialId: a.SerialId,
+	}))
 	if err != nil {
 		a.logger.Error("failed to fetch configuration", log.Err(err))
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		a.logger.Error("failed to fetch configuration", "status", resp.Status)
-		return nil, fmt.Errorf("failed to fetch configuration: %v", resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
+	configResult, err := agentConfigFromProto(resp.Msg)
 	if err != nil {
-		a.logger.Error("failed to read configuration response body", log.Err(err))
+		a.logger.Error("failed to decode agent configuration", log.Err(err))
 		return nil, err
 	}
 
-	var configResult api.AgentConfig
-	if err = json.Unmarshal(body, &configResult); err != nil {
-		a.logger.Error("failed to unmarshal agent configuration", log.Err(err))
-		return nil, err
-	}
-
-	a.logger.Info("configuration pulled", "serial_id", a.SerialId, "configuration", string(body))
-	return &configResult, nil
+	a.logger.Info("configuration pulled", "serial_id", a.SerialId,
+		"generation", configResult.Generation, "tasks", len(configResult.Tasks))
+	return configResult, nil
 }

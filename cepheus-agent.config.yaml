@@ -1,7 +1,8 @@
 # Default config for agent
-control_plane: 
+control_plane:
+  # Base URL of the control plane. Connect derives the RPC route
+  # (/cepheus.agent.v1.AgentConfigService/...) from the service definition.
   url: http://192.168.121.1:8070
-  config_endpoint: /api/v1/devices/config/
   config_pull_interval_secs: 30
 telemetry:
   sink: otel

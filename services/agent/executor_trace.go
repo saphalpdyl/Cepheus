@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"cepheus/api"
 	"cepheus/libs/common"
 	goscamper "cepheus/libs/scamper-client"
 	"context"
@@ -26,10 +25,10 @@ func NewTraceExecutor(
 	}
 }
 
-func (e *TraceExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (common.ProbeResult, error) {
-	p, ok := params.(*api.AgentTaskTraceParams)
+func (e *TraceExecutor) Execute(ctx context.Context, params TaskParams, spec *Task) (common.ProbeResult, error) {
+	p, ok := params.(*TraceParams)
 	if !ok {
-		return common.ProbeResult{}, fmt.Errorf("scamper-client-trace: expected AgentTaskTraceParams, got %T", params)
+		return common.ProbeResult{}, fmt.Errorf("scamper-client-trace: expected TraceParams, got %T", params)
 	}
 
 	resCh, err := e.scamper.Send(fmt.Sprintf("trace -P %s %s", string(p.Method), p.Target))

@@ -1,13 +1,12 @@
 package agent
 
 import (
-	"cepheus/api"
 	"context"
 	"time"
 )
 
 type RunningTask struct {
-	Spec      *api.Task
+	Spec      *Task
 	cancel    context.CancelFunc
 	done      <-chan struct{}
 	startedAt time.Time
@@ -19,6 +18,6 @@ func (rt *RunningTask) Stop() {
 	<-rt.done
 }
 
-func (rt *RunningTask) HotUpdate(newSpec api.Task) {
+func (rt *RunningTask) HotUpdate(newSpec Task) {
 	// rt.Spec.Store(&newSpec)
 }
