@@ -23,7 +23,7 @@ func mkPayload(t *testing.T, doc string) common.TraceDataTracePayload {
 func findLink(links []TraceLink, probeID int, src, dst string) *TraceLink {
 	for i := range links {
 		l := links[i]
-		if l.ProbeID == probeID && l.SrcIP == src && l.DstIP == dst {
+		if l.ProbeID == probeID && l.SrcIP != nil && l.DstIP != nil && *l.SrcIP == src && *l.DstIP == dst {
 			return &links[i]
 		}
 	}
@@ -171,7 +171,7 @@ func TestExtractLinks_Deduplicates(t *testing.T) {
 
 	count := 0
 	for _, l := range links {
-		if l.SrcIP == "10.0.0.1" && l.DstIP == "10.0.0.2" {
+		if l.SrcIP != nil && l.DstIP != nil && *l.SrcIP == "10.0.0.1" && *l.DstIP == "10.0.0.2" {
 			count++
 		}
 	}
