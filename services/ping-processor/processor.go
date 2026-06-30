@@ -11,12 +11,19 @@ import (
 	"sort"
 	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
 	log "cepheus/services/ping-processor/log"
+)
+
+const (
+	flushInterval = 2 * time.Second
+	flushSize     = 50
+	pendingBuffer = 256
 )
 
 type PingProcessor struct {
@@ -27,6 +34,7 @@ type PingProcessor struct {
 	logger *slog.Logger
 	pool   *pgxpool.Pool
 	query  *pingprocessor_db.Queries
+	js     jetstream.JetStream
 }
 
 type LatencyStats struct {
@@ -34,6 +42,12 @@ type LatencyStats struct {
 	P50    time.Duration
 	P95    time.Duration
 	StdDev time.Duration
+}
+
+type pendingPing struct {
+	msg         jetstream.Msg
+	measurement pingprocessor_db.InsertPingMeasurementParams
+	probes      []pingprocessor_db.InsertPingProbesParams
 }
 
 func NewPingProcessor(instanceId string, config PingProcessorConfig, logger *slog.Logger) PingProcessor {
@@ -71,6 +85,7 @@ func (s *PingProcessor) Start(ctx context.Context) error {
 		s.logger.ErrorContext(ctx, "failed to connect to jetstream", log.Err(err))
 		return err
 	}
+	s.js = js
 
 	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:        "PROBE_PING",
@@ -79,6 +94,16 @@ func (s *PingProcessor) Start(ctx context.Context) error {
 	})
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to create or update stream", log.Err(err))
+		return err
+	}
+
+	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:        "MEASUREMENTS",
+		Description: "Stream for processed measurement events consumed by argus",
+		Subjects:    []string{"cepheus.measurement.>"},
+	})
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to create or update measurements stream", log.Err(err))
 		return err
 	}
 
@@ -100,6 +125,9 @@ func (s *PingProcessor) Start(ctx context.Context) error {
 		return err
 	}
 
+	pending := make(chan pendingPing, pendingBuffer)
+	go s.runFlusher(ctx, pending)
+
 	go func() {
 		for {
 			select {
@@ -116,8 +144,7 @@ func (s *PingProcessor) Start(ctx context.Context) error {
 
 			for msg := range msgs.Messages() {
 				var payload common.ReportPayload
-				data := msg.Data()
-				if err = json.Unmarshal(data, &payload); err != nil {
+				if err = json.Unmarshal(msg.Data(), &payload); err != nil {
 					s.logger.WarnContext(ctx, "failed to unmarshal payload", log.Err(err))
 					_ = msg.Nak()
 					continue
@@ -136,24 +163,27 @@ func (s *PingProcessor) Start(ctx context.Context) error {
 					continue
 				}
 
-				if err = s.insertPingData(
+				measurement, probes, metrics := s.buildPing(
 					ctx,
 					payload.SerialID,
 					&payload.AgentConfigId,
 					payload.Payload.Timestamp,
 					pingData,
-				); err != nil {
+				)
+
+				if err = s.publishMeasurement(ctx, payload.SerialID, pingData.Dst, payload.Payload.Timestamp, metrics); err != nil {
+					s.logger.ErrorContext(ctx, "failed to publish measurement event", log.Err(err))
 					_ = msg.Nak()
 					continue
 				}
 
-				if err = msg.Ack(); err != nil {
-					s.logger.ErrorContext(ctx, "failed to ack message", log.Err(err))
+				select {
+				case pending <- pendingPing{msg: msg, measurement: measurement, probes: probes}:
+				case <-ctx.Done():
 					return
 				}
 			}
 		}
-
 	}()
 
 	<-ctx.Done()
@@ -161,13 +191,125 @@ func (s *PingProcessor) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *PingProcessor) insertPingData(
+func (s *PingProcessor) publishMeasurement(ctx context.Context, serialId string, target string, timestamp time.Time, metrics common.PingMetrics) error {
+	metricsData, err := json.Marshal(metrics)
+	if err != nil {
+		return err
+	}
+
+	event := common.MeasurementEvent{
+		Type:      common.ProbeTypePing,
+		SerialID:  serialId,
+		Target:    target,
+		Timestamp: timestamp,
+		Metrics:   metricsData,
+	}
+
+	eventData, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	subject := fmt.Sprintf("cepheus.measurement.ping.%s", serialId)
+
+	return retry.Do(
+		func() error {
+			_, err := s.js.Publish(ctx, subject, eventData)
+			return err
+		},
+		retry.Context(ctx),
+		retry.Attempts(3),
+		retry.DelayType(retry.BackOffDelay),
+	)
+}
+
+func (s *PingProcessor) runFlusher(ctx context.Context, pending <-chan pendingPing) {
+	ticker := time.NewTicker(flushInterval)
+	defer ticker.Stop()
+
+	var batch []pendingPing
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case p := <-pending:
+			batch = append(batch, p)
+			if len(batch) >= flushSize {
+				s.flush(ctx, batch)
+				batch = nil
+			}
+		case <-ticker.C:
+			s.flush(ctx, batch)
+			batch = nil
+		}
+	}
+}
+
+func (s *PingProcessor) flush(ctx context.Context, batch []pendingPing) {
+	if len(batch) == 0 {
+		return
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to start transaction", log.Err(err))
+		s.nakAll(ctx, batch)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	q := s.query.WithTx(tx)
+	for i := range batch {
+		measurement, err := q.InsertPingMeasurement(ctx, batch[i].measurement)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to insert ping measurement", log.Err(err))
+			s.nakAll(ctx, batch)
+			return
+		}
+
+		if len(batch[i].probes) == 0 {
+			continue
+		}
+
+		for j := range batch[i].probes {
+			batch[i].probes[j].MeasurementID = pgtype.UUID{Bytes: measurement.Bytes, Valid: measurement.Valid}
+		}
+
+		if _, err := q.InsertPingProbes(ctx, batch[i].probes); err != nil {
+			s.logger.ErrorContext(ctx, "failed to insert ping probes", log.Err(err))
+			s.nakAll(ctx, batch)
+			return
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		s.logger.ErrorContext(ctx, "failed to commit transaction", log.Err(err))
+		s.nakAll(ctx, batch)
+		return
+	}
+
+	for i := range batch {
+		if err := batch[i].msg.Ack(); err != nil {
+			s.logger.ErrorContext(ctx, "failed to ack message", log.Err(err))
+		}
+	}
+}
+
+func (s *PingProcessor) nakAll(ctx context.Context, batch []pendingPing) {
+	for i := range batch {
+		if err := batch[i].msg.Nak(); err != nil {
+			s.logger.ErrorContext(ctx, "failed to nak message", log.Err(err))
+		}
+	}
+}
+
+func (s *PingProcessor) buildPing(
 	ctx context.Context,
 	serialId string,
 	agentConfigId *string,
 	timestamp time.Time,
 	pingData common.PingDataPayload,
-) error {
+) (pingprocessor_db.InsertPingMeasurementParams, []pingprocessor_db.InsertPingProbesParams, common.PingMetrics) {
 	parsedAgentConfigId := &pgtype.UUID{
 		Bytes: [16]byte{},
 		Valid: false,
@@ -180,13 +322,6 @@ func (s *PingProcessor) insertPingData(
 			s.logger.ErrorContext(ctx, "failed to parse agent config id", log.Err(err))
 		}
 	}
-
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to start transaction", log.Err(err))
-		return err
-	}
-	defer tx.Rollback(ctx)
 
 	rtts := make([]time.Duration, 0, len(pingData.Responses))
 	for _, r := range pingData.Responses {
@@ -202,7 +337,7 @@ func (s *PingProcessor) insertPingData(
 		loss = 1.0 - float64(received)/float64(sent)
 	}
 
-	measurement, err := s.query.WithTx(tx).InsertPingMeasurement(ctx, pingprocessor_db.InsertPingMeasurementParams{
+	measurement := pingprocessor_db.InsertPingMeasurementParams{
 		Timestamp:     pgtype.Timestamptz{Time: timestamp, Valid: true},
 		SerialID:      serialId,
 		AgentConfigID: *parsedAgentConfigId,
@@ -216,19 +351,11 @@ func (s *PingProcessor) insertPingData(
 		RttP50Ns:      int64(stats.P50),
 		RttP95Ns:      int64(stats.P95),
 		RttStddevNs:   int64(msToDuration(pingData.Statistics.Stddev)),
-	})
-	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to insert ping measurement", log.Err(err))
-		return err
 	}
 
 	var probeRows []pingprocessor_db.InsertPingProbesParams
 	for _, r := range pingData.Responses {
 		probeRows = append(probeRows, pingprocessor_db.InsertPingProbesParams{
-			MeasurementID: pgtype.UUID{
-				Bytes: measurement.Bytes,
-				Valid: measurement.Valid,
-			},
 			Tx: pgtype.Timestamptz{
 				Time:  time.Unix(int64(r.Tx.Sec), int64(r.Tx.Usec)*1000),
 				Valid: true,
@@ -243,16 +370,9 @@ func (s *PingProcessor) insertPingData(
 		})
 	}
 
-	// Scamper reports unanswered probes in NoResponses (a list of opaque objects).
-	// Count is what matters; we emit lost-probe rows with the measurement timestamp
-	// as tx so they hypertable-bucket alongside the answered ones.
 	lostCount := sent - received
 	for i := int32(0); i < lostCount; i++ {
 		probeRows = append(probeRows, pingprocessor_db.InsertPingProbesParams{
-			MeasurementID: pgtype.UUID{
-				Bytes: measurement.Bytes,
-				Valid: measurement.Valid,
-			},
 			Tx:     pgtype.Timestamptz{Time: timestamp, Valid: true},
 			Rx:     pgtype.Timestamptz{},
 			IsLost: true,
@@ -261,19 +381,13 @@ func (s *PingProcessor) insertPingData(
 		})
 	}
 
-	if len(probeRows) > 0 {
-		if _, err = s.query.WithTx(tx).InsertPingProbes(ctx, probeRows); err != nil {
-			s.logger.ErrorContext(ctx, "failed to insert ping probes", log.Err(err))
-			return err
-		}
+	metrics := common.PingMetrics{
+		RttP95Ns: int64(stats.P95),
+		Sent:     int64(sent),
+		Received: int64(received),
 	}
 
-	if err = tx.Commit(ctx); err != nil {
-		s.logger.ErrorContext(ctx, "failed to commit transaction", log.Err(err))
-		return err
-	}
-
-	return nil
+	return measurement, probeRows, metrics
 }
 
 func msToDuration(ms float64) time.Duration {
