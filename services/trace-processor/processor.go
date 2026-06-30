@@ -16,6 +16,7 @@ import (
 	processor_shared "cepheus/libs/common/pgx"
 	traceprocessor_db "cepheus/services/trace-processor/db"
 
+	"github.com/avast/retry-go"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,6 +36,7 @@ type TraceProcessor struct {
 	logger *slog.Logger
 	pool   *pgxpool.Pool
 	query  *traceprocessor_db.Queries
+	js     jetstream.JetStream
 
 	// IP -> ASN mapper client
 	asnClient *asn.Client
@@ -78,6 +80,7 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 		s.logger.ErrorContext(ctx, "failed to connect to jetstream", log.Err(err))
 		return err
 	}
+	s.js = js
 
 	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:        "PROBE_TRACE",
@@ -86,6 +89,17 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 	})
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to create or update stream", log.Err(err))
+		return err
+	}
+
+	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:        "MEASUREMENTS",
+		Description: "Stream for processed measurement events consumed by argus",
+		Subjects:    []string{"cepheus.measurement.>"},
+		MaxAge:      24 * time.Hour,
+	})
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to create or update measurements stream", log.Err(err))
 		return err
 	}
 
@@ -316,10 +330,21 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 	sort.Strings(ip_pairs)
 	link_fingerprint_hash := sha256.Sum256([]byte(strings.Join(ip_pairs, ",")))
 
+	asnPathHash := hex.EncodeToString(asn_fingerprint_hash[:8])
+	linkPathHash := hex.EncodeToString(link_fingerprint_hash[:8])
+
+	if err = s.publishMeasurement(ctx, serialId, dstIp.String(), srcIp.String(), payload.Payload.Timestamp, common.TraceMetrics{
+		AsnPathHash:  asnPathHash,
+		LinkPathHash: linkPathHash,
+	}); err != nil {
+		s.logger.ErrorContext(ctx, "failed to publish measurement event", log.Err(err))
+		return err
+	}
+
 	// Upsert fingerprint into measurement
 	_, err = s.query.WithTx(tx).UpsertFingerprintHash(ctx, traceprocessor_db.UpsertFingerprintHashParams{
-		AsnPathHash:  hex.EncodeToString(asn_fingerprint_hash[:8]),
-		LinkPathHash: hex.EncodeToString(link_fingerprint_hash[:8]),
+		AsnPathHash:  asnPathHash,
+		LinkPathHash: linkPathHash,
 		ID:           measurement.ID,
 	})
 	if err != nil {
@@ -407,6 +432,39 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 	s.logger.InfoContext(ctx, "successfully processed trace measurement", "measurement_id", measurement.ID)
 
 	return nil
+}
+
+func (s *TraceProcessor) publishMeasurement(ctx context.Context, serialId string, target string, src string, timestamp time.Time, metrics common.TraceMetrics) error {
+	metricsData, err := json.Marshal(metrics)
+	if err != nil {
+		return err
+	}
+
+	event := common.MeasurementEvent{
+		Type:      common.ProbeTypeTrace,
+		SerialID:  serialId,
+		Target:    target,
+		Src:       src,
+		Timestamp: timestamp,
+		Metrics:   metricsData,
+	}
+
+	eventData, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	subject := fmt.Sprintf("cepheus.measurement.trace.%s", serialId)
+
+	return retry.Do(
+		func() error {
+			_, err := s.js.Publish(ctx, subject, eventData)
+			return err
+		},
+		retry.Context(ctx),
+		retry.Attempts(3),
+		retry.DelayType(retry.BackOffDelay),
+	)
 }
 
 func (s *TraceProcessor) getIPToASNMap(ctx context.Context, ips []netip.Addr, tx pgx.Tx) (map[netip.Addr]pgtype.Int4, error) {
