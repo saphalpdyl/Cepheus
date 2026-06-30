@@ -114,8 +114,10 @@ services:
       - OTEL_ENDPOINT=otel-collector:4318
       - DETECTION_INTERVAL_SECONDS=10
       - CEPHEUS_DB_URL=postgres://postgres:admin@db:5432/postgres?sslmode=disable
+      - NATS_CONNECT_URL=nats://nats-server:4222
     depends_on:
       - db
+      - nats-server
 
   cepheus-frontend:
     image: cepheus-frontend:latest

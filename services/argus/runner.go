@@ -11,6 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 type Argus struct {
@@ -46,9 +48,6 @@ func (d *Argus) Start(ctx context.Context) error {
 	generateDbTransaction := func(ctx context.Context) (pgx.Tx, error) {
 		return d.pool.Begin(ctx)
 	}
-
-	interval := time.Duration(d.config.DetectionIntervalSeconds) * time.Second
-	d.logger.InfoContext(ctx, "argus running", "interval", interval)
 
 	ewma := NewEmwa(EwmaConfig{
 		Alpha:         0.001,
@@ -98,13 +97,52 @@ func (d *Argus) Start(ctx context.Context) error {
 	}
 
 	registry := CreateDefaultRegistry()
-	workCh := make(chan DiscoveredSeries, 64)
+	worker := NewWorker(d.query, d.logger, d.policyEngine, registry, detectors)
 
-	worker := NewWorker(d.query, d.logger, d.policyEngine, registry, detectors, workCh)
-	go worker.Start(ctx)
+	nc, err := nats.Connect(
+		d.config.NatsConnectURL,
+		nats.RetryOnFailedConnect(true),
+		nats.MaxReconnects(100),
+		nats.ReconnectWait(2*time.Second),
+	)
+	if err != nil {
+		d.logger.ErrorContext(ctx, "failed to connect to nats", "url", d.config.NatsConnectURL, log.Err(err))
+		return err
+	}
 
-	watcher := NewWatcher(d.query, workCh, d.logger)
-	go watcher.Start(ctx)
+	js, err := jetstream.New(nc)
+	if err != nil {
+		d.logger.ErrorContext(ctx, "failed to connect to jetstream", log.Err(err))
+		return err
+	}
+
+	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:        "MEASUREMENTS",
+		Description: "Stream for processed measurement events consumed by argus",
+		Subjects:    []string{"cepheus.measurement.>"},
+		MaxAge:      24 * time.Hour,
+	})
+	if err != nil {
+		d.logger.ErrorContext(ctx, "failed to create or update measurements stream", log.Err(err))
+		return err
+	}
+
+	consumer, err := js.CreateOrUpdateConsumer(ctx, "MEASUREMENTS", jetstream.ConsumerConfig{
+		Name:          "argus",
+		Durable:       "argus",
+		FilterSubject: "cepheus.measurement.>",
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		DeliverPolicy: jetstream.DeliverAllPolicy,
+	})
+	if err != nil {
+		d.logger.ErrorContext(ctx, "failed to create or update consumer", log.Err(err))
+		return err
+	}
+
+	router := NewRouter(consumer, worker, d.logger)
+	go router.Start(ctx)
+
+	d.logger.InfoContext(ctx, "argus running")
 
 	<-ctx.Done()
 	return nil

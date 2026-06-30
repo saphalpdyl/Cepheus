@@ -3,7 +3,7 @@
 package integration_test
 
 import (
-	"cepheus/libs/scamper-client"
+	scamper_client "cepheus/libs/scamper-client"
 	"context"
 	"testing"
 	"time"
@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const scamperBinPath = "/opt/agent/scamper"
+const scamperBinPath = "/opt/cepheus-agent/scamper"
 
 func newClient(t *testing.T, ctx context.Context) *scamper_client.ScamperClient {
 	t.Helper()

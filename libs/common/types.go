@@ -29,6 +29,37 @@ const (
 	ProbeTypePing  ProbeType = "ping"
 )
 
+// MeasurementEvent is the processed packet a processor publishes after a
+// measurement, so argus folds it directly instead of polling the database.
+type MeasurementEvent struct {
+	Type      ProbeType       `json:"type"`
+	SerialID  string          `json:"serial_id"`
+	Target    string          `json:"target"`
+	Port      int32           `json:"port,omitempty"`
+	Src       string          `json:"src,omitempty"`
+	Timestamp time.Time       `json:"timestamp"`
+	Metrics   json.RawMessage `json:"metrics"`
+}
+
+type PingMetrics struct {
+	RttP95Ns int64 `json:"rtt_p95_ns"`
+	Sent     int64 `json:"sent"`
+	Received int64 `json:"received"`
+}
+
+type StampMetrics struct {
+	RttP95Ns int64 `json:"rtt_p95_ns"`
+	FwdP95Ns int64 `json:"fwd_p95_ns"`
+	BwdP95Ns int64 `json:"bwd_p95_ns"`
+	Sent     int64 `json:"sent"`
+	Received int64 `json:"received"`
+}
+
+type TraceMetrics struct {
+	AsnPathHash  string `json:"asn_path_hash"`
+	LinkPathHash string `json:"link_path_hash"`
+}
+
 // STAMP Data
 type StampData struct {
 	Target    string           `json:"target"`
