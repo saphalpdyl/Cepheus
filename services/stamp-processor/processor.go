@@ -101,6 +101,7 @@ func (s *StampProcessor) Start(ctx context.Context) error {
 		Name:        "MEASUREMENTS",
 		Description: "Stream for processed measurement events consumed by argus",
 		Subjects:    []string{"cepheus.measurement.>"},
+		MaxAge:      24 * time.Hour,
 	})
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to create or update measurements stream", log.Err(err))
