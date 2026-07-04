@@ -11,3 +11,11 @@ integration:
   tags:
     - docker
     - go
+
+unit:
+  stage: test
+  script:
+    - make test.unit
+  tags:
+    - docker
+    - go

@@ -19,11 +19,19 @@ func mkPayload(t *testing.T, doc string) common.TraceDataTracePayload {
 	return p
 }
 
-// findLink returns the link matching the given probe/src/dst, or nil.
+// findLink returns the link matching the given probe/src/dst, or nil. A link
+// touching a timeout (Z) hop leaves that end's IP pointer nil; such an end
+// matches an empty-string ("") address argument.
 func findLink(links []TraceLink, probeID int, src, dst string) *TraceLink {
+	deref := func(p *string) string {
+		if p == nil {
+			return ""
+		}
+		return *p
+	}
 	for i := range links {
 		l := links[i]
-		if l.ProbeID == probeID && l.SrcIP != nil && l.DstIP != nil && *l.SrcIP == src && *l.DstIP == dst {
+		if l.ProbeID == probeID && deref(l.SrcIP) == src && deref(l.DstIP) == dst {
 			return &links[i]
 		}
 	}
