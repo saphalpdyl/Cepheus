@@ -1,4 +1,4 @@
-.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean
+.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean test.unit
 
 # One time setup ( builds + fills feeds )
 setup: build build-vm refresh-cloud-ip-ranges
@@ -51,6 +51,10 @@ test.build:
 	docker build -t test-stamp-suite:latest -f docker/tests/stamp.test.Dockerfile .
 	docker build -t test-scamper-suite:latest -f docker/tests/scamper.test.Dockerfile .
 	docker build --output type=local,dest=dist/ -f docker/scamper.build.Dockerfile .
+
+make test.unit:
+	go test -v ./libs/stamp/...
+	go test -v ./services/...
 
 test.integration: test.build
 	docker compose -f docker-compose.test.yaml down
