@@ -69,6 +69,10 @@ func NewWorker(
 // process owns one series for its lifetime: it loads the baselines once, then
 // folds every sample the router routes to its inbox.
 func (w *Worker) process(ctx context.Context, series DiscoveredSeries, inbox <-chan inboxItem) {
+	// Since this is a one-time process for one series
+	// the plan method, queries the pipeline registry, to prepare the
+	// monitors(basically a wrapper of one detector with the extractor function and context)
+	// and instantiates them
 	monitors := w.plan(ctx, series)
 
 	for {
@@ -78,6 +82,7 @@ func (w *Worker) process(ctx context.Context, series DiscoveredSeries, inbox <-c
 		case item := <-inbox:
 			batch := drainInbox(inbox, item)
 
+			// The fanout— a "row" packet fans out to multiple monitors
 			if len(monitors) > 0 {
 				rows := make([]RawSample, len(batch))
 				for i, it := range batch {
@@ -210,6 +215,8 @@ func (w *Worker) report(ctx context.Context, key types.SeriesKey, finding *types
 }
 
 func (w *Worker) saveBaseline(ctx context.Context, key types.SeriesKey, state json.RawMessage, lastSeen time.Time) error {
+	// TODO: Move baseline update to the policy engine so that we can
+	// leave the update-freeze-on-finding concern there
 	return w.query.UpsertBaseline(ctx, argus_db.UpsertBaselineParams{
 		SerialID: key.SerialId,
 		SrcIp:    key.SrcIP,

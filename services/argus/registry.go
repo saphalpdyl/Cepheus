@@ -29,6 +29,19 @@ func (p *PipelineRegistry) GetExtractors(st types.SeriesType) []Extractor {
 	return p.entries[st]
 }
 
+// CreateDefaultRegistry create the default Cepheus' registry
+// Each seriesType fans out to multiple Extractor functions that again fan out to multiple detectors
+/*
+ *                        ┌───────►ExtractRTTP95Ns()───────►EWMA
+ *                        │
+ *                        │
+ *                        │                             ┌──►EWMA
+ * SeriesType.STAMP───────┼───────►ExtractFwdP95Ns()────┤
+ *                        │                             └──►BOCPD
+ *                        │
+ *                        │
+ *                        └──────► ExtractLoss()───────────►FREQ
+ */
 func CreateDefaultRegistry() *PipelineRegistry {
 	defaultEntries := map[types.SeriesType][]Extractor{
 		types.SeriesTypeStamp: {
