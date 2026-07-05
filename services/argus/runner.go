@@ -94,6 +94,7 @@ func (d *Argus) Start(ctx context.Context) error {
 	detectors := map[types.DetectorType]types.Detector{
 		types.DetectorTypeEwma:  ewma,
 		types.DetectorTypeBetaB: betab,
+		types.DetectorTypeFreq:  NewFreqDetector(FreqDetectorConfig{GoodThresholdPercent: 0.20, Warmup: 50}),
 	}
 
 	registry := CreateDefaultRegistry()
