@@ -40,37 +40,41 @@ func (f *FreqDetector) Step(state json.RawMessage, ts time.Time, value any) (jso
 			return state, nil, err
 		}
 	}
-
-	entry, ok := st.Entries[v]
-	if !ok {
-		st.Entries[v] = 1
-	} else {
-		st.Entries[v] = entry + 1
+	if st.Entries == nil {
+		st.Entries = make(map[string]int)
 	}
-	st.TotalEntries++
 
+	if v == "" {
+		// TODO: Explicity handling of empty values
+		return state, nil, fmt.Errorf("freq detector: value is empty string")
+	}
+
+	// state update regardless of finding
+	st.Entries[v]++
+	st.TotalEntries++
+	st.N++
+	st.LastSeen = ts.Unix()
+
+	var finding *types.Finding
 	prob := float64(st.Entries[v]) / float64(st.TotalEntries)
-	if prob < f.GoodThresholdPercent && st.N >= int64(f.config.Warmup) {
-		finding := &types.Finding{
-			TS: ts,
-			Value:     prob,
-			Severity:  12 * (1.0 - prob), // crunches to range 0-12
+	if st.N >= int64(f.config.Warmup) && prob < f.config.GoodThresholdPercent {
+		finding = &types.Finding{
+			TS:       ts,
+			Value:    prob,
+			Severity: 12 * (1.0 - prob), // crunches to range 0-12
 			Details: &types.FreqFindingDetails{
 				Probability:  prob,
 				CurrentCount: int64(st.Entries[v]),
 				TotalCount:   st.TotalEntries,
 			},
 		}
-		st.N++
-		st.LastSeen = ts.Unix()
-		next, err := json.Marshal(st)
-		if err != nil {
-			return state, nil, err
-		}
-
-		return next, finding, nil
 	}
 
-	return state, nil, nil
-} 
+	next, err := json.Marshal(st)
+	if err != nil {
+		return state, nil, err
+	}
+
+	return next, finding, nil
+}
 

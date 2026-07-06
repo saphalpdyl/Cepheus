@@ -62,6 +62,8 @@ func (d *Argus) Start(ctx context.Context) error {
 		Warmup:    50,
 	})
 
+	freq := NewFreqDetector(FreqDetectorConfig{GoodThresholdPercent: 0.20, Warmup: 50})
+
 	d.policyEngine, err = NewPolicyEngine(PolicyEngineConfig{
 		Logger: d.logger.With("DOMAIN", "POLICY_ENGINE"),
 		Query:  d.query,
@@ -94,7 +96,7 @@ func (d *Argus) Start(ctx context.Context) error {
 	detectors := map[types.DetectorType]types.Detector{
 		types.DetectorTypeEwma:  ewma,
 		types.DetectorTypeBetaB: betab,
-		types.DetectorTypeFreq:  NewFreqDetector(FreqDetectorConfig{GoodThresholdPercent: 0.20, Warmup: 50}),
+		types.DetectorTypeFreq:  freq,
 	}
 
 	registry := CreateDefaultRegistry()
