@@ -12,8 +12,8 @@ import (
 )
 
 const insertStampMeasurement = `-- name: InsertStampMeasurement :one
-INSERT INTO stamp_measurements (timestamp, serial_id, agent_config_id, target, port, sent, received, loss, rtt_p95_ns, bwd_p95_ns, fwd_p95_ns)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO stamp_measurements (timestamp, serial_id, agent_config_id, target, port, sent, received, loss, rtt_p95_ns, bwd_p95_ns, fwd_p95_ns, fwd_p50_ns, rtt_p50_ns, bwd_p50_ns)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING id
 `
 
@@ -29,6 +29,9 @@ type InsertStampMeasurementParams struct {
 	RttP95Ns      int64
 	BwdP95Ns      int64
 	FwdP95Ns      int64
+	FwdP50Ns      int64
+	RttP50Ns      int64
+	BwdP50Ns      int64
 }
 
 func (q *Queries) InsertStampMeasurement(ctx context.Context, arg InsertStampMeasurementParams) (pgtype.UUID, error) {
@@ -44,6 +47,9 @@ func (q *Queries) InsertStampMeasurement(ctx context.Context, arg InsertStampMea
 		arg.RttP95Ns,
 		arg.BwdP95Ns,
 		arg.FwdP95Ns,
+		arg.FwdP50Ns,
+		arg.RttP50Ns,
+		arg.BwdP50Ns,
 	)
 	var id pgtype.UUID
 	err := row.Scan(&id)

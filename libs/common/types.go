@@ -43,6 +43,7 @@ type MeasurementEvent struct {
 
 type PingMetrics struct {
 	RttP95Ns int64 `json:"rtt_p95_ns"`
+	RttP50Ns int64 `json:"rtt_p50_ns"`
 	Sent     int64 `json:"sent"`
 	Received int64 `json:"received"`
 }
@@ -51,6 +52,9 @@ type StampMetrics struct {
 	RttP95Ns int64 `json:"rtt_p95_ns"`
 	FwdP95Ns int64 `json:"fwd_p95_ns"`
 	BwdP95Ns int64 `json:"bwd_p95_ns"`
+	RttP50Ns int64 `json:"rtt_p50_ns"`
+	FwdP50Ns int64 `json:"fwd_p50_ns"`
+	BwdP50Ns int64 `json:"bwd_p50_ns"`
 	Sent     int64 `json:"sent"`
 	Received int64 `json:"received"`
 }

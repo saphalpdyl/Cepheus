@@ -46,26 +46,26 @@ func CreateDefaultRegistry() *PipelineRegistry {
 	defaultEntries := map[types.SeriesType][]Extractor{
 		types.SeriesTypeStamp: {
 			{
-				MetricName: "fwd_p95_ns",
+				MetricName: "fwd_p50_ns",
 				Extract: func(data any) (any, error) {
 					m := data.(common.StampMetrics)
-					return float64(m.FwdP95Ns), nil
+					return float64(m.FwdP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
-				MetricName: "bwd_p95_ns",
+				MetricName: "bwd_p50_ns",
 				Extract: func(data any) (any, error) {
 					m := data.(common.StampMetrics)
-					return float64(m.BwdP95Ns), nil
+					return float64(m.BwdP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
-				MetricName: "rtt_p95_ns",
+				MetricName: "rtt_p50_ns",
 				Extract: func(data any) (any, error) {
 					m := data.(common.StampMetrics)
-					return float64(m.RttP95Ns), nil
+					return float64(m.RttP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
@@ -83,10 +83,10 @@ func CreateDefaultRegistry() *PipelineRegistry {
 		},
 		types.SeriesTypePing: {
 			{
-				MetricName: "rtt_p95_ns",
+				MetricName: "rtt_p50_ns",
 				Extract: func(data any) (any, error) {
 					m := data.(common.PingMetrics)
-					return float64(m.RttP95Ns), nil
+					return float64(m.RttP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},

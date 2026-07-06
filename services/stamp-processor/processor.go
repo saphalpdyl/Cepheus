@@ -355,6 +355,9 @@ func (s *StampProcessor) buildStamp(
 		RttP95Ns:      int64(rttStats.P95),
 		FwdP95Ns:      int64(fwdStats.P95),
 		BwdP95Ns:      int64(bwdStats.P95),
+		RttP50Ns:      int64(rttStats.P50),
+		FwdP50Ns:      int64(fwdStats.P50),
+		BwdP50Ns:      int64(bwdStats.P50),
 	}
 
 	var probeRows []stampprocessor_db.InsertStampProbesParams
@@ -390,6 +393,9 @@ func (s *StampProcessor) buildStamp(
 		BwdP95Ns: int64(bwdStats.P95),
 		Sent:     int64(stampData.Sent),
 		Received: int64(stampData.Received),
+		RttP50Ns: int64(rttStats.P50),
+		FwdP50Ns: int64(fwdStats.P50),
+		BwdP50Ns: int64(bwdStats.P50),
 	}
 
 	return measurement, probeRows, metrics

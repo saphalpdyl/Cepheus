@@ -384,6 +384,7 @@ func (s *PingProcessor) buildPing(
 
 	metrics := common.PingMetrics{
 		RttP95Ns: int64(stats.P95),
+		RttP50Ns: int64(stats.P50),
 		Sent:     int64(sent),
 		Received: int64(received),
 	}
