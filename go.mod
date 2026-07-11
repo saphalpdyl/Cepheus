@@ -2,11 +2,13 @@ module cepheus
 
 go 1.25.0
 
+toolchain go1.25.12
+
 require (
 	connectrpc.com/connect v1.20.0
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.9.1
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0
 	github.com/nats-io/nats.go v1.51.0
 	github.com/samber/slog-multi v1.8.0
