@@ -1,7 +1,7 @@
 package argus
 
 import (
-	argus_db "cepheus/services/argus/db"
+	"cepheus/libs/common"
 	"cepheus/services/argus/types"
 )
 
@@ -29,40 +29,53 @@ func (p *PipelineRegistry) GetExtractors(st types.SeriesType) []Extractor {
 	return p.entries[st]
 }
 
+// CreateDefaultRegistry create the default Cepheus' registry
+// Each seriesType fans out to multiple Extractor functions that again fan out to multiple detectors
+/*
+ *                        ┌───────►ExtractRTTP95Ns()───────►EWMA
+ *                        │
+ *                        │
+ *                        │                             ┌──►EWMA
+ * SeriesType.STAMP───────┼───────►ExtractFwdP95Ns()────┤
+ *                        │                             └──►BOCPD
+ *                        │
+ *                        │
+ *                        └──────► ExtractLoss()───────────►FREQ
+ */
 func CreateDefaultRegistry() *PipelineRegistry {
 	defaultEntries := map[types.SeriesType][]Extractor{
 		types.SeriesTypeStamp: {
 			{
-				MetricName: "fwd_p95_ns",
+				MetricName: "fwd_p50_ns",
 				Extract: func(data any) (any, error) {
-					row := data.(argus_db.FetchStampSamplesRow)
-					return float64(row.FwdP95Ns), nil
+					m := data.(common.StampMetrics)
+					return float64(m.FwdP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
-				MetricName: "bwd_p95_ns",
+				MetricName: "bwd_p50_ns",
 				Extract: func(data any) (any, error) {
-					row := data.(argus_db.FetchStampSamplesRow)
-					return float64(row.BwdP95Ns), nil
+					m := data.(common.StampMetrics)
+					return float64(m.BwdP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
-				MetricName: "rtt_p95_ns",
+				MetricName: "rtt_p50_ns",
 				Extract: func(data any) (any, error) {
-					row := data.(argus_db.FetchStampSamplesRow)
-					return float64(row.RttP95Ns), nil
+					m := data.(common.StampMetrics)
+					return float64(m.RttP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
 				MetricName: "loss",
 				Extract: func(data any) (any, error) {
-					row := data.(argus_db.FetchStampSamplesRow)
+					m := data.(common.StampMetrics)
 					return LossSample{
-						Sent:     int64(row.Sent),
-						Received: int64(row.Received),
+						Sent:     m.Sent,
+						Received: m.Received,
 					}, nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeBetaB},
@@ -70,20 +83,20 @@ func CreateDefaultRegistry() *PipelineRegistry {
 		},
 		types.SeriesTypePing: {
 			{
-				MetricName: "rtt_p95_ns",
+				MetricName: "rtt_p50_ns",
 				Extract: func(data any) (any, error) {
-					row := data.(argus_db.FetchPingSamplesRow)
-					return float64(row.RttP95Ns), nil
+					m := data.(common.PingMetrics)
+					return float64(m.RttP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
 				MetricName: "packet_loss_percent",
 				Extract: func(data any) (any, error) {
-					row := data.(argus_db.FetchPingSamplesRow)
+					m := data.(common.PingMetrics)
 					return LossSample{
-						Sent:     int64(row.Sent),
-						Received: int64(row.Received),
+						Sent:     m.Sent,
+						Received: m.Received,
 					}, nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeBetaB},
@@ -93,16 +106,16 @@ func CreateDefaultRegistry() *PipelineRegistry {
 			{
 				MetricName: "asn_path_hash",
 				Extract: func(data any) (any, error) {
-					row := data.(argus_db.FetchTraceSamplesRow)
-					return row.AsnPathHash, nil
+					m := data.(common.TraceMetrics)
+					return m.AsnPathHash, nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeFreq},
 			},
 			{
 				MetricName: "link_path_hash",
 				Extract: func(data any) (any, error) {
-					row := data.(argus_db.FetchTraceSamplesRow)
-					return row.LinkPathHash, nil
+					m := data.(common.TraceMetrics)
+					return m.LinkPathHash, nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeFreq},
 			},

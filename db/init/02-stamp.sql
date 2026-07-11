@@ -13,7 +13,10 @@ CREATE TABLE IF NOT EXISTS stamp_measurements
     loss            FLOAT       NOT NULL,
     rtt_p95_ns      BIGINT       NOT NULL,
     bwd_p95_ns      BIGINT       NOT NULL,
-    fwd_p95_ns      BIGINT       NOT NULL
+    fwd_p95_ns      BIGINT       NOT NULL,
+    rtt_p50_ns      BIGINT       NOT NULL,
+    fwd_p50_ns      BIGINT       NOT NULL,
+    bwd_p50_ns      BIGINT       NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS stamp_probes

@@ -17,46 +17,6 @@ ON CONFLICT (serial_id, src_ip, target, port, metric, detector) DO UPDATE SET st
                                                                               last_seen  = EXCLUDED.last_seen,
                                                                               updated_at = now();
 
--- name: ListActiveStampSeries :many
-SELECT DISTINCT serial_id, target, port
-FROM stamp_measurements
-WHERE timestamp >= $1;
-
--- name: ListActivePingSeries :many
-SELECT DISTINCT serial_id, target
-FROM ping_measurements
-WHERE timestamp >= $1;
-
--- name: ListActiveTraceSeries :many
-SELECT DISTINCT serial_id, src, dst, method
-FROM trace_measurements
-WHERE timestamp >= $1;
-
--- name: FetchStampSamples :many
-SELECT timestamp, rtt_p95_ns, fwd_p95_ns, bwd_p95_ns, sent, received
-FROM stamp_measurements
-WHERE serial_id = $1
-  AND target = $2
-  AND port = $3
-  AND timestamp > @after
-  AND timestamp <= @before;
-
--- name: FetchPingSamples :many
-SELECT timestamp, rtt_p95_ns, sent, received
-FROM ping_measurements
-WHERE serial_id = $1
-  AND target = $2
-  AND timestamp > @after
-  AND timestamp <= @before;
-
--- name: FetchTraceSamples :many
-SELECT timestamp, asn_path_hash, link_path_hash
-FROM trace_measurements
-WHERE serial_id = $1
-  AND src = $2
-  AND dst = $3
-  AND type = $4;
-
 -- name: InsertFinding :one
 INSERT INTO argus_findings
 (serial_id, target, port, metric, detector, ts, value, severity, details)

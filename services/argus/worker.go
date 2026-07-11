@@ -7,16 +7,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
-	"net/netip"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// DiscoveredSeries is the watcher's hand-off: just the identity of a series to
+// DiscoveredSeries is the router's hand-off: just the identity of a series to
 // process. The worker expands it via the registry and owns its baselines.
 type DiscoveredSeries struct {
 	Type     types.SeriesType
@@ -26,8 +24,8 @@ type DiscoveredSeries struct {
 	Src      string // present only in TRACE
 }
 
-// RawSample is one fetched measurement row with its timestamp lifted out.
-// Row stays opaque; the per-metric Extractor knows how to read it.
+// RawSample is one measurement with its timestamp lifted out. Row stays opaque;
+// the per-metric Extractor knows how to read it.
 type RawSample struct {
 	TS  time.Time
 	Row any
@@ -50,8 +48,6 @@ type Worker struct {
 	pe        *PolicyEngine
 	pr        *PipelineRegistry
 	detectors map[types.DetectorType]types.Detector
-
-	workCh <-chan DiscoveredSeries
 }
 
 func NewWorker(
@@ -60,7 +56,6 @@ func NewWorker(
 	pe *PolicyEngine,
 	pr *PipelineRegistry,
 	detectors map[types.DetectorType]types.Detector,
-	workCh <-chan DiscoveredSeries,
 ) *Worker {
 	return &Worker{
 		query:     query,
@@ -68,40 +63,55 @@ func NewWorker(
 		pe:        pe,
 		pr:        pr,
 		detectors: detectors,
-		workCh:    workCh,
 	}
 }
 
-func (w *Worker) Start(ctx context.Context) {
+// process owns one series for its lifetime: it loads the baselines once, then
+// folds every sample the router routes to its inbox.
+func (w *Worker) process(ctx context.Context, series DiscoveredSeries, inbox <-chan inboxItem) {
+	// Since this is a one-time process for one series
+	// the plan method, queries the pipeline registry, to prepare the
+	// monitors(basically a wrapper of one detector with the extractor function and context)
+	// and instantiates them
+	monitors := w.plan(ctx, series)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case series := <-w.workCh:
-			go w.process(ctx, series)
+		case item := <-inbox:
+			batch := drainInbox(inbox, item)
+
+			// The fanout— a "row" packet fans out to multiple monitors
+			if len(monitors) > 0 {
+				rows := make([]RawSample, len(batch))
+				for i, it := range batch {
+					rows[i] = it.sample
+				}
+				for _, m := range monitors {
+					w.fold(ctx, m, rows)
+				}
+			}
+
+			for _, it := range batch {
+				if err := it.msg.Ack(); err != nil {
+					w.logger.ErrorContext(ctx, "failed to ack message", log.Err(err))
+				}
+			}
 		}
 	}
 }
 
-// process owns one series for the lifetime of the worker: it loads the
-// baselines once, then re-fetches and folds on a cadence.
-func (w *Worker) process(ctx context.Context, series DiscoveredSeries) {
-	monitors := w.plan(ctx, series)
-	if len(monitors) == 0 {
-		return
-	}
-
-	w.tick(ctx, series, monitors) // run once immediately, then on the cadence
-
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
+// drainInbox takes the first sample plus any already queued, so a burst folds
+// and persists the baseline once instead of once per sample.
+func drainInbox(inbox <-chan inboxItem, first inboxItem) []inboxItem {
+	batch := []inboxItem{first}
 	for {
 		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			w.tick(ctx, series, monitors)
+		case it := <-inbox:
+			batch = append(batch, it)
+		default:
+			return batch
 		}
 	}
 }
@@ -156,104 +166,6 @@ func (w *Worker) plan(ctx context.Context, series DiscoveredSeries) []*monitor {
 	return monitors
 }
 
-// tick fetches once from the oldest cursor across all monitors (so one query
-// serves every detector on the series) and folds each monitor forward.
-func (w *Worker) tick(ctx context.Context, series DiscoveredSeries, monitors []*monitor) {
-	oldest := time.Now()
-	for _, m := range monitors {
-		if m.cursor.Before(oldest) {
-			oldest = m.cursor
-		}
-	}
-
-	rows, err := w.fetch(ctx, series, oldest)
-	if err != nil {
-		w.logger.ErrorContext(ctx, "failed to fetch samples", log.Err(err))
-		return
-	}
-	if len(rows) == 0 {
-		return
-	}
-
-	for _, m := range monitors {
-		w.fold(ctx, m, rows)
-	}
-}
-
-// fetch is the ONLY place series type matters. Each case runs its own query and
-// boxes the rows into a uniform []RawSample; everything downstream is type-blind.
-func (w *Worker) fetch(ctx context.Context, series DiscoveredSeries, after time.Time) ([]RawSample, error) {
-	switch series.Type {
-	case types.SeriesTypeStamp:
-		rows, err := w.query.FetchStampSamples(ctx, argus_db.FetchStampSamplesParams{
-			SerialID: series.SerialId,
-			Target:   series.Target,
-			Port:     series.Port,
-			After:    pgtype.Timestamptz{Time: after, Valid: true},
-			Before:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		})
-		if err != nil {
-			return nil, err
-		}
-		out := make([]RawSample, len(rows))
-		for i, r := range rows {
-			out[i] = RawSample{TS: r.Timestamp.Time, Row: r}
-		}
-		return out, nil
-	case types.SeriesTypePing:
-		rows, err := w.query.FetchPingSamples(ctx, argus_db.FetchPingSamplesParams{
-			SerialID: series.SerialId,
-			Target:   series.Target,
-			After:    pgtype.Timestamptz{Time: after, Valid: true},
-			Before:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		out := make([]RawSample, len(rows))
-		for i, r := range rows {
-			out[i] = RawSample{TS: r.Timestamp.Time, Row: r}
-		}
-		return out, nil
-	case types.SeriesTypeTrace:
-		dst_ip, err := netip.ParseAddr(series.Target)
-		if err != nil {
-			return nil, fmt.Errorf("invalid target IP: %w", err)
-		}
-
-		// Verify that the Src is not a zero value
-		if series.Src == "" {
-			return nil, fmt.Errorf("source IP is empty: required for TRACE series")
-		}
-
-		src_ip, err := netip.ParseAddr(series.Src)
-		if err != nil {
-			return nil, fmt.Errorf("invalid source IP: %w", err)
-		}
-
-		rows, err := w.query.FetchTraceSamples(ctx, argus_db.FetchTraceSamplesParams{
-			SerialID: series.SerialId,
-			Dst:      dst_ip,
-			Src:      src_ip,
-			Type:     "trace",
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		out := make([]RawSample, len(rows))
-		for i, r := range rows {
-			out[i] = RawSample{TS: r.Timestamp.Time, Row: r}
-		}
-		return out, nil
-
-	default:
-		return nil, fmt.Errorf("no fetcher for series type %q", series.Type)
-	}
-}
-
 // fold runs every sample newer than the monitor's cursor through its detector,
 // advancing the monitor's state/cursor in place and persisting if anything moved.
 func (w *Worker) fold(ctx context.Context, m *monitor, rows []RawSample) {
@@ -303,6 +215,8 @@ func (w *Worker) report(ctx context.Context, key types.SeriesKey, finding *types
 }
 
 func (w *Worker) saveBaseline(ctx context.Context, key types.SeriesKey, state json.RawMessage, lastSeen time.Time) error {
+	// TODO: Move baseline update to the policy engine so that we can
+	// leave the update-freeze-on-finding concern there
 	return w.query.UpsertBaseline(ctx, argus_db.UpsertBaselineParams{
 		SerialID: key.SerialId,
 		SrcIp:    key.SrcIP,

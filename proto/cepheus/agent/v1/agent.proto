@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+// cepheus.agent.v1 is the control-plane - agent contract: the agent calls the
+// control plane to resolve its desired configuration.
+package cepheus.agent.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// AgentConfigService is served by the control plane (server) and called by agents.
+service AgentConfigService {
+  // GetAgentConfig returns the full desired configuration for the agent
+  // identified by its hardware serial id.
+  rpc GetAgentConfig(GetAgentConfigRequest) returns (GetAgentConfigResponse);
+}
+
+message GetAgentConfigRequest {
+  string serial_id = 1;
+}
+
+message GetAgentConfigResponse {
+  AgentConfig config = 1;
+}
+
+message AgentConfig {
+  string id = 1;
+  int32 generation = 2;
+  string report_endpoint = 3;
+  int32 report_batch_size = 4;
+  int32 report_interval_seconds = 5;
+  int32 report_timeout_seconds = 6;
+  repeated PendingAction pending_actions = 7;
+  repeated Task tasks = 8;
+  // updated_at is unix epoch seconds.
+  int64 updated_at = 9;
+  int32 scamper_pps = 10;
+}
+
+// TaskType discriminates which params variant a Task carries.
+enum TaskType {
+  TASK_TYPE_UNSPECIFIED = 0;
+  TASK_TYPE_STAMP_SENDER = 1;
+  TASK_TYPE_STAMP_REFLECTOR = 2;
+  TASK_TYPE_TRACE = 3;
+  TASK_TYPE_TRACE_LB = 4;
+  TASK_TYPE_PING = 5;
+}
+
+message TaskSchedule {
+  bool enabled = 1;
+  int32 interval_seconds = 2;
+  int32 jitter_percent = 3;
+}
+
+message Task {
+  string task_id = 1;
+  TaskType type = 2;
+  bool enabled = 3;
+  int32 generation = 4;
+  TaskSchedule schedule = 5;
+
+  // params is the typed payload for this task. The active field must match `type`.
+  oneof params {
+    PingParams ping = 6;
+    TraceParams trace = 7;
+    TraceLbParams trace_lb = 8;
+    StampSenderParams stamp_sender = 9;
+    StampReflectorParams stamp_reflector = 10;
+  }
+}
+
+message PingParams {
+  string target = 1;
+  string source_ip = 2;
+  int32 count = 3;
+  int32 size = 4;
+  int32 dscp = 5;
+  int32 timeout_seconds = 6;
+}
+
+message TraceParams {
+  string target = 1;
+  string source_ip = 2;
+  // method is one of: icmp-paris, udp-paris, tcp (common.TraceProbeMethod).
+  string method = 3;
+  int32 max_ttl = 4;
+  int32 first_ttl = 5;
+  int32 dscp = 6;
+  int32 wait_seconds = 7;
+}
+
+message TraceLbParams {
+  string target = 1;
+  string source_ip = 2;
+  int32 max_ttl = 3;
+  int32 first_ttl = 4;
+  int32 dscp = 5;
+  double confidence = 6;
+}
+
+message StampSenderParams {
+  string target = 1;
+  int32 target_port = 2;
+  string source_ip = 3;
+  int32 dscp = 4;
+  bool require_clock_sync = 5;
+  int32 packet_count = 6;
+  google.protobuf.Duration packet_interval = 7;
+}
+
+message StampReflectorParams {
+  int32 listen_port = 1;
+  string source_ip = 2;
+  int32 dscp = 3;
+  bool require_clock_sync = 4;
+}
+
+// PendingActionType discriminates which one-shot action the control plane has
+// scheduled for the agent.
+enum PendingActionType {
+  PENDING_ACTION_TYPE_UNSPECIFIED = 0;
+  PENDING_ACTION_TYPE_RESTART = 1;
+}
+
+message PendingAction {
+  string id = 1;
+  PendingActionType type = 2;
+  // created_on is unix epoch seconds.
+  int64 created_on = 3;
+  PendingActionParams params = 4;
+}
+
+message PendingActionParams {
+  google.protobuf.Timestamp scheduled_on = 1;
+}

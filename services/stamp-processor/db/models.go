@@ -21,6 +21,9 @@ type StampMeasurement struct {
 	RttP95Ns      int64
 	BwdP95Ns      int64
 	FwdP95Ns      int64
+	RttP50Ns      int64
+	FwdP50Ns      int64
+	BwdP50Ns      int64
 }
 
 type StampProbe struct {

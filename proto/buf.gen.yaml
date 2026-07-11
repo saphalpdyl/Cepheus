@@ -1,0 +1,20 @@
+version: v2
+# Managed mode sets go_package on every file for us, so .proto files stay free of
+# go_package boilerplate. Import paths become: <prefix>/<proto-dir>, e.g.
+#   cepheus/agent/v1/agent.proto -> cepheus/libs/api/gen/cepheus/agent/v1
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: cepheus/libs/api/gen
+plugins:
+  # Message + enum types.
+  - local: protoc-gen-go
+    out: ../libs/api/gen
+    opt:
+      - paths=source_relative
+  # Connect RPC client + handler stubs (rides on net/http).
+  - local: protoc-gen-connect-go
+    out: ../libs/api/gen
+    opt:
+      - paths=source_relative

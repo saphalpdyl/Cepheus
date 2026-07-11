@@ -1,4 +1,4 @@
-.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup
+.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean test.unit
 
 # One time setup ( builds + fills feeds )
 setup: build build-vm refresh-cloud-ip-ranges
@@ -52,6 +52,10 @@ test.build:
 	docker build -t test-scamper-suite:latest -f docker/tests/scamper.test.Dockerfile .
 	docker build --output type=local,dest=dist/ -f docker/scamper.build.Dockerfile .
 
+make test.unit:
+	go test -v ./libs/stamp/...
+	go test -v ./services/...
+
 test.integration: test.build
 	docker compose -f docker-compose.test.yaml down
 	docker compose -f docker-compose.test.yaml up -d
@@ -62,6 +66,24 @@ test.integration: test.build
 # Generators
 sqlc-gen:
 	UID=$(shell id -u) GID=$(shell id -g) docker compose -f docker-compose.dev.yaml run --rm sqlc
+
+# Protobuf / Connect API codegen.
+# Source of truth: proto/. Generated Go (committed): libs/api/gen/.
+# The whole repo is mounted so buf's `out: ../libs/api/gen` (relative to proto/)
+# writes back into the tree; -u keeps generated files owned by the host user.
+PROTO_RUN = docker run --rm -v $(PWD):/workspace -w /workspace/proto
+
+proto-image:
+	docker build -t cepheus-buf proto
+
+proto-gen: proto-image
+	$(PROTO_RUN) -u $(shell id -u):$(shell id -g) -e HOME=/tmp cepheus-buf generate
+
+proto-lint: proto-image
+	$(PROTO_RUN) cepheus-buf lint
+
+proto-clean:
+	rm -rf libs/api/gen
 
 # Personal
 sync:

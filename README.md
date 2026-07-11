@@ -2,7 +2,12 @@
 
 ---
 
+> [!IMPORTANT]
+> The repository on GitHub is a mirror maintained for visibility. Issue tracking and active development are done on [GitLab.](https://gitlab.com/saphalpdyl/Cepheus)
+
 Modularized route health monitoring with software-based agents for managed network systems.
+
+> Created and Maintained by [Saphal K. Poudyal](https://saphal.me)
 
 ### Table of Contents
 
@@ -20,12 +25,12 @@ Given the spec-driven design that will be implementated once the API and require
 
 Below is the draft architecture diagram for cepheus platform as a whole.
 
-![architecture diagram](/docs/images/arch.png)
+![architecture diagram](/docs/images/arch.svg)
 
-### Contributions
-Although the development environment is developer-friendly and reproducible, the project lacks proper documentations for its architecture and design choices to be considered welcoming to contributors.
+# Contributions & Governance
+Cepheus is an independent open-source project create and maintained by Saphal Kumar Poudyal. All architectural decisions, direction of the roadmap, and project governance are at the sole discretion of the maintainer.
 
-Once that is formed, the project will welcome contributors.
+Contributions are welcome via pull requests and issues. However, accepted contributions do not transfer governance rights.
 
 ### Screenshots
 ![Fleet Overview](/docs/images/screenshots/redesign/fleet.png)

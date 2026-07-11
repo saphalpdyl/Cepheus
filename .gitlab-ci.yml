@@ -4,9 +4,18 @@ stages:
 integration:
   stage: test
   script:
+    - make test.build
     - make test.integration
   after_script:
     - docker compose -f docker-compose.test.yaml down
+  tags:
+    - docker
+    - go
+
+unit:
+  stage: test
+  script:
+    - make test.unit
   tags:
     - docker
     - go

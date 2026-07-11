@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        { "label": "telemetry", "type": "shell", "command": "make telemetry", "presentation": { "panel": "new", "reveal": "always" }, "problemMatcher": [] },
+        { "label": "db",        "type": "shell", "command": "make db",        "presentation": { "panel": "new", "reveal": "always" }, "problemMatcher": [] },
+        { "label": "fe",        "type": "shell", "command": "make fe",        "presentation": { "panel": "new", "reveal": "always" }, "problemMatcher": [] },
+        { "label": "dev",       "type": "shell", "command": "make dev",       "presentation": { "panel": "new", "reveal": "always" }, "problemMatcher": [] },
+        { "label": "vagrant",   "type": "shell", "command": "vagrant up && vagrant ssh -c 'cd cepheus && make apply'", "presentation": { "panel": "new", "reveal": "always" }, "problemMatcher": [] },
+        { "label": "dozzle",    "type": "shell", "command": "docker compose -f docker-compose.dev.yaml up dozzle -d", "presentation": { "panel": "new", "reveal": "always" } },
+        {
+            "label": "all",
+            "dependsOn": ["telemetry", "db", "fe", "dev", "vagrant", "dozzle"],
+            "dependsOrder": "parallel",
+            "problemMatcher": []
+        }
+    ]
+}

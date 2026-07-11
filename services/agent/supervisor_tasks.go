@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"cepheus/api"
 	"cepheus/services/agent/log"
 	"context"
 	"encoding/json"
@@ -9,9 +8,9 @@ import (
 	"time"
 )
 
-func (s *Supervisor) SetDesiredTasks(tasks []api.Task) {
+func (s *Supervisor) SetDesiredTasks(tasks []Task) {
 
-	desired := make(map[string]api.Task, len(tasks))
+	desired := make(map[string]Task, len(tasks))
 	for _, t := range tasks {
 		desired[t.TaskID] = t
 	}
@@ -25,19 +24,15 @@ func (s *Supervisor) SetDesiredTasks(tasks []api.Task) {
 }
 
 func (s *Supervisor) runOnce(ctx context.Context, rt *RunningTask) {
-	params, err := rt.Spec.ParseParams()
-	if err != nil {
-		s.logger.ErrorContext(ctx, "error parsing param for task", "task_id", rt.Spec.TaskID)
-		return
-	}
-
 	executor, ok := s.executors[rt.Spec.Type]
 	if !ok {
 		s.logger.ErrorContext(ctx, fmt.Sprintf("executor for %s not found", rt.Spec.Type))
 		return
 	}
 
-	res, err := executor.Execute(ctx, params, rt.Spec)
+	// Params is already the typed variant for rt.Spec.Type (mapped from the
+	// protobuf oneof at config-pull time), so there is no re-parse here.
+	res, err := executor.Execute(ctx, rt.Spec.Params, rt.Spec)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "error executing probe task", log.Err(err), "task_id", rt.Spec.TaskID)
 		return
@@ -57,7 +52,7 @@ func (s *Supervisor) runOnce(ctx context.Context, rt *RunningTask) {
 	s.logger.InfoContext(ctx, fmt.Sprintf("probe result type %s", rt.Spec.Type), "result", string(data))
 }
 
-func (s *Supervisor) startTask(spec *api.Task) *RunningTask {
+func (s *Supervisor) startTask(spec *Task) *RunningTask {
 	ctx, cancel := context.WithCancel(s.ctx)
 	done := make(chan struct{})
 
@@ -78,9 +73,8 @@ func (s *Supervisor) startTask(spec *api.Task) *RunningTask {
 }
 
 func (s *Supervisor) startTaskLoop(ctx context.Context, rt *RunningTask) {
-	_, err := rt.Spec.ParseParams()
-	if err != nil {
-		s.logger.ErrorContext(ctx, "could not parse task params", "task_id", rt.Spec.TaskID)
+	if rt.Spec.Params == nil {
+		s.logger.ErrorContext(ctx, "task has no params", "task_id", rt.Spec.TaskID)
 		return
 	}
 

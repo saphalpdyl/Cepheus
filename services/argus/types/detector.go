@@ -52,6 +52,15 @@ type BetaBinomialFindingDetails struct {
 
 func (b *BetaBinomialFindingDetails) DetectorName() string { return string(DetectorTypeBetaB) }
 
+
+type FreqFindingDetails struct {
+	Probability float64
+	CurrentCount int64
+	TotalCount int64
+}
+
+func (f *FreqFindingDetails) DetectorName() string { return string(DetectorTypeFreq) }
+
 // Detector is the one interface the worker talks to. It is deliberately not
 // generic: the worker hands over the prior baseline state and an opaque value,
 // and each detector asserts the concrete type it expects on line one. That

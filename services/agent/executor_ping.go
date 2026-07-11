@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"cepheus/api"
 	"cepheus/libs/common"
 	scamper_client "cepheus/libs/scamper-client"
 	"context"
@@ -27,12 +26,12 @@ func NewPingExecutor(
 
 func (p *PingExecutor) Execute(
 	ctx context.Context,
-	params api.TaskParams,
-	spec *api.Task,
+	params TaskParams,
+	spec *Task,
 ) (common.ProbeResult, error) {
-	pr, ok := params.(*api.AgentTaskPingParams)
+	pr, ok := params.(*PingParams)
 	if !ok {
-		return common.ProbeResult{}, fmt.Errorf("params parsing error: expected AgentTaskPingParams, got %T", params)
+		return common.ProbeResult{}, fmt.Errorf("params parsing error: expected PingParams, got %T", params)
 	}
 
 	resCh, err := p.scamper.Send(

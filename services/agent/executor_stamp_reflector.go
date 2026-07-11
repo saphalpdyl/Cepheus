@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"cepheus/api"
 	"cepheus/libs/common"
 	"cepheus/libs/stamp"
 	"context"
@@ -23,11 +22,11 @@ func NewStampReflectorExecutor(stampCfg stamp.Config, logger *slog.Logger) *Stam
 	}
 }
 
-func (e *StampReflectorExecutor) Execute(ctx context.Context, params api.TaskParams, spec *api.Task) (common.ProbeResult, error) {
+func (e *StampReflectorExecutor) Execute(ctx context.Context, params TaskParams, spec *Task) (common.ProbeResult, error) {
 
-	p, ok := params.(*api.AgentTaskStampReflectorParams)
+	p, ok := params.(*StampReflectorParams)
 	if !ok {
-		return common.ProbeResult{}, fmt.Errorf("stamp-sender: expected AgentTaskStampSenderParams, got %T", params)
+		return common.ProbeResult{}, fmt.Errorf("stamp-reflector: expected StampReflectorParams, got %T", params)
 	}
 
 	reflectorConfig := stamp.ReflectorConfig{

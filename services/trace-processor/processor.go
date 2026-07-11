@@ -2,8 +2,6 @@ package traceprocessor
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -16,6 +14,7 @@ import (
 	processor_shared "cepheus/libs/common/pgx"
 	traceprocessor_db "cepheus/services/trace-processor/db"
 
+	"github.com/avast/retry-go"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,6 +34,7 @@ type TraceProcessor struct {
 	logger *slog.Logger
 	pool   *pgxpool.Pool
 	query  *traceprocessor_db.Queries
+	js     jetstream.JetStream
 
 	// IP -> ASN mapper client
 	asnClient *asn.Client
@@ -78,6 +78,7 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 		s.logger.ErrorContext(ctx, "failed to connect to jetstream", log.Err(err))
 		return err
 	}
+	s.js = js
 
 	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:        "PROBE_TRACE",
@@ -86,6 +87,17 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 	})
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to create or update stream", log.Err(err))
+		return err
+	}
+
+	_, err = js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:        "MEASUREMENTS",
+		Description: "Stream for processed measurement events consumed by argus",
+		Subjects:    []string{"cepheus.measurement.>"},
+		MaxAge:      24 * time.Hour,
+	})
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to create or update measurements stream", log.Err(err))
 		return err
 	}
 
@@ -297,15 +309,13 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		traceHops[i].Asn = fetchedASN
 	}
 
-
-	// Generate fingerprints
-	asn_pairs := ""
+	// ASN fingerprint: AS2123:AS2132:AS213128
+	asnFingerprint := ""
 	for _, asn := range uniqueASNs {
-		asn_pairs += fmt.Sprintf(":AS%d", asn)
+		asnFingerprint += fmt.Sprintf(":AS%d", asn)
 	}
-	asn_fingerprint_hash := sha256.Sum256([]byte(asn_pairs))
 
-	// Generate link_fingerprint
+	// Link fingerprint: 232.123.242.123->192.123.123.123,11.11.11.11->123.123.123.123
 	links := extractLinks(traceDataPayload)
 	ip_pairs := make([]string, 0, len(links))
 	for _, l := range links {
@@ -314,12 +324,20 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		}
 	}
 	sort.Strings(ip_pairs)
-	link_fingerprint_hash := sha256.Sum256([]byte(strings.Join(ip_pairs, ",")))
+	linkFingerprint := strings.Join(ip_pairs, ",")
+
+	if err = s.publishMeasurement(ctx, serialId, dstIp.String(), srcIp.String(), payload.Payload.Timestamp, common.TraceMetrics{
+		AsnPathHash:  asnFingerprint,
+		LinkPathHash: linkFingerprint,
+	}); err != nil {
+		s.logger.ErrorContext(ctx, "failed to publish measurement event", log.Err(err))
+		return err
+	}
 
 	// Upsert fingerprint into measurement
 	_, err = s.query.WithTx(tx).UpsertFingerprintHash(ctx, traceprocessor_db.UpsertFingerprintHashParams{
-		AsnPathHash:  hex.EncodeToString(asn_fingerprint_hash[:8]),
-		LinkPathHash: hex.EncodeToString(link_fingerprint_hash[:8]),
+		AsnPathHash:  asnFingerprint,
+		LinkPathHash: linkFingerprint,
 		ID:           measurement.ID,
 	})
 	if err != nil {
@@ -348,7 +366,7 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		return err
 	}
 
-	// Convert 
+	// Convert
 	dbLinks := make([]traceprocessor_db.InsertTraceLinkParams, 0, len(links))
 	for _, l := range links {
 		srcIP := (*netip.Addr)(nil)
@@ -371,7 +389,6 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			}
 		}
 
-
 		diffRttValue := 0.0
 		if l.DiffRTT != nil {
 			diffRttValue = *l.DiffRTT
@@ -384,13 +401,13 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			SrcIp:         srcIP,
 			DstIp:         dstIP,
 			TtlGap:        int32(l.TTLGap),
-			DiffRtt:       pgtype.Float8{
+			DiffRtt: pgtype.Float8{
 				Float64: diffRttValue,
-				Valid:  l.DiffRTT != nil,
+				Valid:   l.DiffRTT != nil,
 			},
-			IsSrcRespond:  l.IsSrcRespond,
-			IsDstRespond:  l.IsDstRespond,
-		})	
+			IsSrcRespond: l.IsSrcRespond,
+			IsDstRespond: l.IsDstRespond,
+		})
 	}
 
 	_, err = s.query.WithTx(tx).InsertTraceLink(ctx, dbLinks)
@@ -407,6 +424,39 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 	s.logger.InfoContext(ctx, "successfully processed trace measurement", "measurement_id", measurement.ID)
 
 	return nil
+}
+
+func (s *TraceProcessor) publishMeasurement(ctx context.Context, serialId string, target string, src string, timestamp time.Time, metrics common.TraceMetrics) error {
+	metricsData, err := json.Marshal(metrics)
+	if err != nil {
+		return err
+	}
+
+	event := common.MeasurementEvent{
+		Type:      common.ProbeTypeTrace,
+		SerialID:  serialId,
+		Target:    target,
+		Src:       src,
+		Timestamp: timestamp,
+		Metrics:   metricsData,
+	}
+
+	eventData, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	subject := fmt.Sprintf("cepheus.measurement.trace.%s", serialId)
+
+	return retry.Do(
+		func() error {
+			_, err := s.js.Publish(ctx, subject, eventData)
+			return err
+		},
+		retry.Context(ctx),
+		retry.Attempts(3),
+		retry.DelayType(retry.BackOffDelay),
+	)
 }
 
 func (s *TraceProcessor) getIPToASNMap(ctx context.Context, ips []netip.Addr, tx pgx.Tx) (map[netip.Addr]pgtype.Int4, error) {

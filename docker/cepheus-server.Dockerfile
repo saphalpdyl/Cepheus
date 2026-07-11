@@ -9,8 +9,8 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY services/server/ ./services/server/
-COPY api/ ./api/
 COPY cepheus-server.config.yaml ./cepheus-server.config.yaml
+COPY libs/api/ ./libs/api/
 COPY libs/common/ ./libs/common/
 COPY libs/telemetry/ ./libs/telemetry/
 

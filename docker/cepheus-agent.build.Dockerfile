@@ -11,7 +11,7 @@ RUN go mod download
 COPY services/agent/ ./services/agent/
 COPY libs/common/ ./libs/common/
 COPY cepheus-agent.config.yaml ./cepheus-agent.config.yaml
-COPY api/ ./api/
+COPY libs/api/ ./libs/api/
 COPY libs/scamper-client/ ./libs/scamper-client/
 COPY libs/stamp/ ./libs/stamp/
 COPY libs/telemetry/ ./libs/telemetry/

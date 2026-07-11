@@ -11,6 +11,7 @@ type DetectorConfig struct {
 	OtelSink                 string
 	OtelEndpoint             string
 	DatabaseURL              string
+	NatsConnectURL           string
 	DetectionIntervalSeconds int
 }
 
@@ -31,6 +32,9 @@ func GetConfig() DetectorConfig {
 	databaseUrl, err := common.TryGetFromEnv("CEPHEUS_DB_URL")
 	handleConfigErrorWithExit(err)
 
+	natsConnectUrl, err := common.TryGetFromEnv("NATS_CONNECT_URL")
+	handleConfigErrorWithExit(err)
+
 	intervalStr, err := common.TryGetFromEnv("DETECTION_INTERVAL_SECONDS")
 	handleConfigErrorWithExit(err)
 
@@ -41,6 +45,7 @@ func GetConfig() DetectorConfig {
 		OtelSink:                 otelSink,
 		OtelEndpoint:             otelEndpoint,
 		DatabaseURL:              databaseUrl,
+		NatsConnectURL:           natsConnectUrl,
 		DetectionIntervalSeconds: interval,
 	}
 }
