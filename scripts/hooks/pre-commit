@@ -1,6 +1,7 @@
 #! /bin/sh
 
 echo "Running linting..."
+make lint.editorconfig
 make lint
 
 echo "Running tests..."

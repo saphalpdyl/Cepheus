@@ -2,7 +2,7 @@
 
 # One time setup ( builds + fills feeds )
 setup: build build-vm refresh-cloud-ip-ranges
-	@sh scripts/hooks/install-hooks.sh
+	./scripts/hooks/install-hooks.sh
 
 # Host Related
 build:
