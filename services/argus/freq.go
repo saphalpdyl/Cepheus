@@ -8,15 +8,15 @@ import (
 )
 
 type FreqState struct {
-	Entries map[string]int `json:"entries"`
-	N int64 `json:"n"`
-	LastSeen int64 `json:"last_seen"`
+	Entries  map[string]int `json:"entries"`
+	N        int64          `json:"n"`
+	LastSeen int64          `json:"last_seen"`
 
 	TotalEntries int64 `json:"total_entries"`
 }
 
 type FreqDetectorConfig struct {
-	Warmup int
+	Warmup               int
 	GoodThresholdPercent float64 // percentage below which we consider it an anomaly
 }
 
@@ -45,7 +45,7 @@ func (f *FreqDetector) Step(state json.RawMessage, ts time.Time, value any) (jso
 	}
 
 	if v == "" {
-		// TODO: Explicity handling of empty values
+		// TODO: Explicitly handling of empty values
 		return state, nil, fmt.Errorf("freq detector: value is empty string")
 	}
 
@@ -77,4 +77,3 @@ func (f *FreqDetector) Step(state json.RawMessage, ts time.Time, value any) (jso
 
 	return next, finding, nil
 }
-
