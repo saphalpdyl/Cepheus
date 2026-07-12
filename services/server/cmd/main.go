@@ -31,6 +31,7 @@ func main() {
 		cfgPath = os.Args[1]
 	}
 
+	// #nosec G703 G304 -- cfgPath is an operator-supplied CLI argument.
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
 		log().Error("failed to read config", "path", cfgPath, "error", err)

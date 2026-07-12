@@ -41,7 +41,7 @@ func (s *Supervisor) reconcile(ctx context.Context) {
 
 		if !exists {
 			// New task — start it
-			rt := s.startTask(&desired)
+			rt := s.startTask(ctx, &desired)
 			s.running[id] = rt
 			continue
 		}
@@ -54,7 +54,7 @@ func (s *Supervisor) reconcile(ctx context.Context) {
 		// just restart for now
 		s.logger.InfoContext(ctx, "restarting task", "task_id", running.Spec.TaskID)
 		running.Stop()
-		newRt := s.startTask(&desired)
+		newRt := s.startTask(ctx, &desired)
 		s.running[id] = newRt
 	}
 }

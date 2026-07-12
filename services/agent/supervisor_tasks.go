@@ -19,7 +19,7 @@ func (s *Supervisor) SetDesiredTasks(tasks []Task) {
 	s.desired = desired
 	s.mu.Unlock()
 
-	s.logger.InfoContext(s.ctx, "Reconcilation starting...")
+	s.logger.InfoContext(s.ctx, "Reconciliation starting...")
 	s.reconcile(s.ctx)
 }
 
@@ -52,8 +52,8 @@ func (s *Supervisor) runOnce(ctx context.Context, rt *RunningTask) {
 	s.logger.InfoContext(ctx, fmt.Sprintf("probe result type %s", rt.Spec.Type), "result", string(data))
 }
 
-func (s *Supervisor) startTask(spec *Task) *RunningTask {
-	ctx, cancel := context.WithCancel(s.ctx)
+func (s *Supervisor) startTask(ctx context.Context, spec *Task) *RunningTask {
+	ctx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 
 	rt := &RunningTask{
@@ -85,7 +85,7 @@ func (s *Supervisor) startTaskLoop(ctx context.Context, rt *RunningTask) {
 	}
 
 	// RunOnce without intervals
-	if rt.Spec.Schedule.Enabled == false {
+	if !rt.Spec.Schedule.Enabled {
 		s.runOnce(ctx, rt)
 		return
 	}

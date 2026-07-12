@@ -50,4 +50,4 @@ lint:
     GOLANGCI_LINT_CACHE: $CI_PROJECT_DIR/.cache/golangci-lint
     GOPATH: $CI_PROJECT_DIR/.cache/go
   script:
-    - golangci-lint run ./...
+    - make lint

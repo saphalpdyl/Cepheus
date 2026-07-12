@@ -46,7 +46,7 @@ apply: clean build-vm
 	$(MAKE) ips
 
 
-# Tests
+# Tests and lints
 test.build:
 	docker build -t test-stamp-suite:latest -f docker/tests/stamp.test.Dockerfile .
 	docker build -t test-scamper-suite:latest -f docker/tests/scamper.test.Dockerfile .
@@ -62,6 +62,9 @@ test.integration: test.build
 	go test -v -tags integration ./libs/stamp/tests/integration
 	docker compose -f docker-compose.test.yaml exec scamper-test-suite go test -v -tags integration /app/libs/scamper-client/tests/integration
 	docker compose -f docker-compose.test.yaml down
+
+lint:
+	golangci-lint run ./...
 
 # Enforce .editorconfig across the whole repo. Config: .editorconfig-checker.json.
 lint.editorconfig:

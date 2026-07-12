@@ -113,7 +113,7 @@ func (d *Dispatcher) Start(ctx context.Context, interval time.Duration) (err err
 					}
 
 					if ack.Duplicate {
-						d.logger.WarnContext(ctx, "duplicate ACK recieved from NATS", "data", payloadData)
+						d.logger.WarnContext(ctx, "duplicate ACK received from NATS", "data", payloadData)
 					}
 
 					return nil

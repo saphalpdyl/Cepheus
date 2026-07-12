@@ -72,7 +72,7 @@ func NewErrorEstimate(
 ) (*ErrorEstimate, error) {
 
 	if scale > 63 {
-		return nil, errors.New("Scale out of range: 0 < scale < 63")
+		return nil, errors.New("scale out of range: 0 < scale < 63")
 	}
 
 	return &ErrorEstimate{

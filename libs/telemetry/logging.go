@@ -70,7 +70,8 @@ func SetupLogging(ctx context.Context, sink, endpoint, serviceName, instanceID s
 }
 
 func newFileHandler(path string) (slog.Handler, error) {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// #nosec G304 -- path is the operator-configured log file, not external input.
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return nil, err
 	}

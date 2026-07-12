@@ -67,6 +67,7 @@ func NewClient(cfg ScamperClientConfig) (*ScamperClient, error) {
 func (s *ScamperClient) Start(ctx context.Context) error {
 	os.Remove(s.SocketPath)
 
+	// #nosec G204 -- BinPath is operator-provided configuration, not external input.
 	s.cmd = exec.CommandContext(ctx, s.BinPath,
 		"-U", s.SocketPath,
 		"-p", fmt.Sprintf("%d", s.PPS),
@@ -92,7 +93,8 @@ func (s *ScamperClient) Start(ctx context.Context) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	conn, err := net.Dial("unix", s.SocketPath)
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(ctx, "unix", s.SocketPath)
 	if err != nil {
 		s.cmd.Process.Kill()
 		return fmt.Errorf("failed to connect to socket: %w", err)

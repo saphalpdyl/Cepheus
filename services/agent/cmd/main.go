@@ -47,6 +47,7 @@ func main() {
 		scamperBinPath = path.Join(dirPath, "scamper")
 	}
 
+	// #nosec G703 G304
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
 		slog.Error("failed to read config", "path", cfgPath, "error", err)
