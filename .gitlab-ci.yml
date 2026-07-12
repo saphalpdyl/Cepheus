@@ -41,17 +41,13 @@ unit:
 lint:
   image: golangci/golangci-lint:latest
   stage: lint
-  parallel:
-    matrix:
-      - LINTER:
-          - govet
-          - errcheck
-          - gosec
-          - staticcheck
-          - misspell
-          - ineffassign
-          - noctx
-          - bodyclose
-          - nilerr
+  cache:
+    key: golangci-lint-$CI_COMMIT_REF_SLUG
+    paths:
+      - .cache/golangci-lint
+      - .cache/go/pkg/mod
+  variables:
+    GOLANGCI_LINT_CACHE: $CI_PROJECT_DIR/.cache/golangci-lint
+    GOPATH: $CI_PROJECT_DIR/.cache/go
   script:
-    - golangci-lint run --enable-only $LINTER ./...
+    - golangci-lint run ./...
