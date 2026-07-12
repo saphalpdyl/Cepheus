@@ -1,0 +1,7 @@
+#! /bin/sh
+
+echo "Running linting..."
+make lint
+
+echo "Running tests..."
+make test.unit
