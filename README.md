@@ -7,6 +7,9 @@
 
 Modularized route health monitoring with software-based agents for managed network systems.
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Pipeline status](https://gitlab.com/saphalpdyl/Cepheus/badges/main/pipeline.svg)](https://gitlab.com/saphalpdyl/Cepheus/-/commits/main)
+
 > Created and Maintained by [Saphal K. Poudyal](https://saphal.me)
 
 ### Table of Contents
