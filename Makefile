@@ -1,4 +1,4 @@
-.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean test.unit
+.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean test.unit lint.editorconfig
 
 # One time setup ( builds + fills feeds )
 setup: build build-vm refresh-cloud-ip-ranges
@@ -62,6 +62,10 @@ test.integration: test.build
 	go test -v -tags integration ./libs/stamp/tests/integration
 	docker compose -f docker-compose.test.yaml exec scamper-test-suite go test -v -tags integration /app/libs/scamper-client/tests/integration
 	docker compose -f docker-compose.test.yaml down
+
+# Enforce .editorconfig across the whole repo. Config: .editorconfig-checker.json.
+lint.editorconfig:
+	docker run --rm -v $(PWD):/check -w /check mstruebing/editorconfig-checker:latest ec
 
 # Generators
 sqlc-gen:

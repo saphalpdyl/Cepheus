@@ -1,0 +1,13 @@
+{
+  "Exclude": [
+    "\\.sql\\.go$",
+    "^libs/api/gen/",
+    "^services/server/handler/agent_config\\.go$",
+    "(^|/)Makefile$",
+    "\\.mk$",
+    "\\.ipynb$"
+  ],
+  "Disable": {
+    "IndentSize": true
+  }
+}

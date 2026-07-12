@@ -1,5 +1,14 @@
 stages:
+  - lint
   - test
+
+editorconfig:
+  stage: lint
+  script:
+    - make lint.editorconfig
+  tags:
+    - docker
+    - go
 
 integration:
   stage: test
@@ -19,3 +28,22 @@ unit:
   tags:
     - docker
     - go
+
+lint:
+  image: golangci/golangci-lint:latest
+  stage: test
+  parallel:
+    matrix:
+      - LINTER:
+          - govet
+          - errcheck
+          - gosec
+          - staticcheck
+          - misspell
+          - ineffassign
+          - noctx
+          - bodyclose
+          - nilerr
+          - gofumpt
+  script:
+    - golangci-lint run --enable-only $LINTER ./...

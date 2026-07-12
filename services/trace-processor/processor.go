@@ -373,7 +373,7 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 		return err
 	}
 
-	// Convert 
+	// Convert
 	dbLinks := make([]traceprocessor_db.InsertTraceLinkParams, 0, len(links))
 	for _, l := range links {
 		srcIP := (*netip.Addr)(nil)
@@ -415,7 +415,7 @@ func (s *TraceProcessor) processNormalTrace(ctx context.Context, pool *pgxpool.P
 			},
 			IsSrcRespond:  l.IsSrcRespond,
 			IsDstRespond:  l.IsDstRespond,
-		})	
+		})
 	}
 
 	_, err = s.query.WithTx(tx).InsertTraceLink(ctx, dbLinks)

@@ -1,0 +1,59 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.go]
+indent_style = tab
+indent_size = 4
+
+[go.{mod,sum}]
+indent_style = tab
+indent_size = 4
+
+[*.{ex,exs,heex,eex}]
+indent_style = space
+indent_size = 2
+
+[*.{js,jsx,ts,tsx,css}]
+indent_style = space
+indent_size = 2
+
+[*.proto]
+indent_style = space
+indent_size = 2
+
+[*.sql]
+indent_style = space
+indent_size = 2
+
+[*.{yaml,yml,json,toml}]
+indent_style = space
+indent_size = 2
+
+[*.sh]
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[{Makefile,*.mk}]
+indent_style = tab
+
+[{Dockerfile,*.Dockerfile,Dockerfile.*}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+# Markdown embeds code blocks in many languages (tabs, 2/4 spaces);
+# don't enforce a single indent style/size here.
+indent_style = unset
+indent_size = unset
