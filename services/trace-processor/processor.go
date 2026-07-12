@@ -40,6 +40,20 @@ type TraceProcessor struct {
 	asnClient *asn.Client
 }
 
+// ack acknowledges a message, logging (but not failing on) an ack error.
+func (s *TraceProcessor) ack(ctx context.Context, msg jetstream.Msg) {
+	if err := msg.Ack(); err != nil {
+		s.logger.WarnContext(ctx, "failed to ack message", log.Err(err))
+	}
+}
+
+// nak negatively-acknowledges a message so it is redelivered, logging any error.
+func (s *TraceProcessor) nak(ctx context.Context, msg jetstream.Msg) {
+	if err := msg.Nak(); err != nil {
+		s.logger.WarnContext(ctx, "failed to nak message", log.Err(err))
+	}
+}
+
 func NewTraceProcessor(instanceId string, config TraceProcessorConfig, logger *slog.Logger) TraceProcessor {
 	return TraceProcessor{
 		InstanceId: instanceId,
@@ -139,48 +153,48 @@ func (s *TraceProcessor) Start(ctx context.Context) error {
 				data := msg.Data()
 				if err = json.Unmarshal(data, &payload); err != nil {
 					s.logger.WarnContext(ctx, "failed to unmarshal payload", log.Err(err))
-					msg.Nak()
+					s.nak(ctx, msg)
 					continue
 				}
 
 				// Parse the inner data
 				if payload.Payload.ProbeType != common.ProbeTypeTrace {
 					s.logger.ErrorContext(ctx, "got invalid probe type", "expected", "trace", "got", payload.Payload.ProbeType)
-					msg.Nak()
+					s.nak(ctx, msg)
 					continue
 				}
 
 				var traceData common.TraceData
 				if err = json.Unmarshal(payload.Payload.Data, &traceData); err != nil {
 					s.logger.ErrorContext(ctx, "couldn't unmarshal traceData wrapper")
-					msg.Nak()
+					s.nak(ctx, msg)
 					continue
 				}
 
 				if traceData.Format != "json" {
 					s.logger.ErrorContext(ctx, fmt.Sprintf("unsupported format %s", string(traceData.Format)))
-					msg.Nak()
+					s.nak(ctx, msg)
 					continue
 				}
 
 				// Unmarshal json
 				if traceData.Type == common.TraceProbeTypeTrace {
 					if err = s.processNormalTrace(ctx, pool, &traceData, &payload, payload.SerialID, payload.AgentConfigId); err != nil {
-						msg.Nak()
+						s.nak(ctx, msg)
 						continue
 					}
 				} else if traceData.Type == common.TraceProbeTypeTraceLb {
 					// TODO: Do this
 					s.logger.WarnContext(ctx, "json-based tracelb parser not implemented yet")
-					msg.Ack()
+					s.ack(ctx, msg)
 					continue
 				} else {
 					s.logger.ErrorContext(ctx, fmt.Sprintf("unsupported type %s", string(traceData.Type)))
-					msg.Nak()
+					s.nak(ctx, msg)
 					continue
 				}
 
-				msg.Ack()
+				s.ack(ctx, msg)
 			}
 		}
 	}()

@@ -44,7 +44,7 @@ func (p *PingExecutor) Execute(
 
 	select {
 	case <-ctx.Done():
-		return common.ProbeResult{}, fmt.Errorf("context cancelled")
+		return common.ProbeResult{}, fmt.Errorf("context canceled")
 	case res := <-resCh:
 		return common.ProbeResult{
 			TaskID:    spec.TaskID,

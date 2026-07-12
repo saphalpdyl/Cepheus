@@ -5,6 +5,6 @@ RUN apt-get update && \
     git
 
 WORKDIR /app
-    
+
 RUN git clone https://github.com/asmie/stamp-suite.git .
 RUN cargo build --release

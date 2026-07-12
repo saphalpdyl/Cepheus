@@ -38,7 +38,7 @@ func (e *TraceExecutor) Execute(ctx context.Context, params TaskParams, spec *Ta
 
 	select {
 	case <-ctx.Done():
-		return common.ProbeResult{}, fmt.Errorf("context cancelled")
+		return common.ProbeResult{}, fmt.Errorf("context canceled")
 	case res := <-resCh:
 		data := common.TraceData{
 			Type:   common.TraceProbeTypeTrace, // TODO: This should be configurable

@@ -10,12 +10,3 @@ services:
     working_dir: /src
     command: generate
     user: "${UID}:${GID}"
-
-  # Used to view logs in the web browser
-  dozzle:
-    image: amir20/dozzle:latest
-    container_name: magnolia-logs
-    ports:
-      - "8888:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro

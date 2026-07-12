@@ -47,6 +47,7 @@ func main() {
 		scamperBinPath = path.Join(dirPath, "scamper")
 	}
 
+	// #nosec G703 G304
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
 		slog.Error("failed to read config", "path", cfgPath, "error", err)
@@ -73,14 +74,22 @@ func main() {
 		slog.Error("failed to setup logging", "error", err)
 		os.Exit(1)
 	}
-	defer logShutdown(ctx)
+	defer func() {
+		if err := logShutdown(ctx); err != nil {
+			slog.Error("failed to shut down logging", "error", err)
+		}
+	}()
 
 	traceShutdown, err := telemetry.SetupTracing(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "agent", "", false, attribute.String("serial_id", serialID))
 	if err != nil {
 		slog.Error("failed to setup tracing", "error", err)
 		os.Exit(1)
 	}
-	defer traceShutdown(ctx)
+	defer func() {
+		if err := traceShutdown(ctx); err != nil {
+			slog.Error("failed to shut down tracing", "error", err)
+		}
+	}()
 
 	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

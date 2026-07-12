@@ -27,14 +27,22 @@ func main() {
 		slog.Error("failed to setup logging", "error", err)
 		os.Exit(1)
 	}
-	defer logShutdown(ctx)
+	defer func() {
+		if err := logShutdown(ctx); err != nil {
+			slog.Error("failed to shut down logging", "error", err)
+		}
+	}()
 
 	traceShutdown, err := telemetry.SetupTracing(ctx, config.OtelSink, config.OtelEndpoint, "ping-processor", serviceInstanceId, false)
 	if err != nil {
 		slog.Error("failed to setup tracing", "error", err)
 		os.Exit(1)
 	}
-	defer traceShutdown(ctx)
+	defer func() {
+		if err := traceShutdown(ctx); err != nil {
+			slog.Error("failed to shut down tracing", "error", err)
+		}
+	}()
 
 	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

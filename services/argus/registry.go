@@ -1,6 +1,8 @@
 package argus
 
 import (
+	"fmt"
+
 	"cepheus/libs/common"
 	"cepheus/services/argus/types"
 )
@@ -48,31 +50,43 @@ func CreateDefaultRegistry() *PipelineRegistry {
 			{
 				MetricName: "fwd_p50_ns",
 				Extract: func(data any) (any, error) {
-					m := data.(common.StampMetrics)
-					return float64(m.FwdP50Ns), nil
+					m, ok := data.(common.StampMetrics)
+					if !ok {
+						return nil, fmt.Errorf("expected common.StampMetrics, got %T", data)
+					}
+					return float64(m.FwdP95Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
 				MetricName: "bwd_p50_ns",
 				Extract: func(data any) (any, error) {
-					m := data.(common.StampMetrics)
-					return float64(m.BwdP50Ns), nil
+					m, ok := data.(common.StampMetrics)
+					if !ok {
+						return nil, fmt.Errorf("expected common.StampMetrics, got %T", data)
+					}
+					return float64(m.BwdP95Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
 				MetricName: "rtt_p50_ns",
 				Extract: func(data any) (any, error) {
-					m := data.(common.StampMetrics)
-					return float64(m.RttP50Ns), nil
+					m, ok := data.(common.StampMetrics)
+					if !ok {
+						return nil, fmt.Errorf("expected common.StampMetrics, got %T", data)
+					}
+					return float64(m.RttP95Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
 				MetricName: "loss",
 				Extract: func(data any) (any, error) {
-					m := data.(common.StampMetrics)
+					m, ok := data.(common.StampMetrics)
+					if !ok {
+						return nil, fmt.Errorf("expected common.StampMetrics, got %T", data)
+					}
 					return LossSample{
 						Sent:     m.Sent,
 						Received: m.Received,
@@ -85,15 +99,21 @@ func CreateDefaultRegistry() *PipelineRegistry {
 			{
 				MetricName: "rtt_p50_ns",
 				Extract: func(data any) (any, error) {
-					m := data.(common.PingMetrics)
-					return float64(m.RttP50Ns), nil
+					m, ok := data.(common.PingMetrics)
+					if !ok {
+						return nil, fmt.Errorf("expected common.PingMetrics, got %T", data)
+					}
+					return float64(m.RttP95Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
 			{
 				MetricName: "packet_loss_percent",
 				Extract: func(data any) (any, error) {
-					m := data.(common.PingMetrics)
+					m, ok := data.(common.PingMetrics)
+					if !ok {
+						return nil, fmt.Errorf("expected common.PingMetrics, got %T", data)
+					}
 					return LossSample{
 						Sent:     m.Sent,
 						Received: m.Received,
@@ -106,7 +126,10 @@ func CreateDefaultRegistry() *PipelineRegistry {
 			{
 				MetricName: "asn_path_hash",
 				Extract: func(data any) (any, error) {
-					m := data.(common.TraceMetrics)
+					m, ok := data.(common.TraceMetrics)
+					if !ok {
+						return nil, fmt.Errorf("expected common.TraceMetrics, got %T", data)
+					}
 					return m.AsnPathHash, nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeFreq},
@@ -114,7 +137,10 @@ func CreateDefaultRegistry() *PipelineRegistry {
 			{
 				MetricName: "link_path_hash",
 				Extract: func(data any) (any, error) {
-					m := data.(common.TraceMetrics)
+					m, ok := data.(common.TraceMetrics)
+					if !ok {
+						return nil, fmt.Errorf("expected common.TraceMetrics, got %T", data)
+					}
 					return m.LinkPathHash, nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeFreq},

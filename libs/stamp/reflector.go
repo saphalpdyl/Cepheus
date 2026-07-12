@@ -60,7 +60,8 @@ func NewReflector(cfg ReflectorConfig) (*Reflector, error) {
 // Serve runs the reflector loop until the underlying connection is closed.
 // Each received packet is reflected back to its sender.
 func (r *Reflector) Serve(ctx context.Context) error {
-	udpServer, err := net.ListenPacket("udp", r.LocalAddr)
+	var lc net.ListenConfig
+	udpServer, err := lc.ListenPacket(ctx, "udp", r.LocalAddr)
 	if err != nil {
 		return err
 	}

@@ -91,7 +91,7 @@ func extractLinks(payload common.TraceDataTracePayload) []TraceLink {
 
 			if !src.IsTimeout {
 				link.SrcIP = &src.Addr
-			} 
+			}
 
 			if !dst.IsTimeout {
 				link.DstIP = &dst.Addr;

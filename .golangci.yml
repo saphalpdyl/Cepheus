@@ -1,0 +1,52 @@
+version: "2"
+
+linters:
+  enable:
+    - govet
+    - gosec
+    - errcheck
+    - staticcheck
+    - misspell
+    - ineffassign
+    - noctx
+    - bodyclose
+    - sqlclosecheck
+    - nilerr
+    - contextcheck
+    - exhaustive
+    - unparam
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        # Reordering struct fields to save padding bytes; not worth the churn.
+        - fieldalignment
+        # Shadowing `err` inside if/for blocks is idiomatic Go.
+        - shadow
+
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        # int -> int32/uint32 conversions on values known to be in range
+        # (DB rows, proto fields); too noisy to be actionable.
+        - G115
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+      exclude-functions:
+        - os.Remove
+        - (*os.Process).Kill
+        - (net.Conn).Close
+        - (net.Conn).SetReadDeadline
+        - (net.PacketConn).Close
+        - (*cepheus/libs/stamp.Sender).Close
+        - (github.com/jackc/pgx/v5.Tx).Rollback
+
+    misspell:
+      locale: US
+
+    exhaustive:
+      # A `default` clause that handles unlisted enum values counts as exhaustive.
+      default-signifies-exhaustive: true

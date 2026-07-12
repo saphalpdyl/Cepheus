@@ -7,9 +7,9 @@ services:
       - POSTGRES_PASSWORD=admin
     volumes:
       - ./db/init/:/docker-entrypoint-initdb.d/
-    ports: 
+    ports:
       - 5435:5432
-  
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: cepheus-pgadmin
@@ -142,7 +142,7 @@ services:
 
   # ----- Our own stuff -----
 
-  # ----- Telemetry ----- 
+  # ----- Telemetry -----
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     volumes:
@@ -177,9 +177,9 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
 
-  # ----- Telemetry ----- 
+  # ----- Telemetry -----
 
-  # ----- Ephemeral Runners ----- 
+  # ----- Ephemeral Runners -----
   cepheus-feeds-refresh-cloud-ranges:
     container_name: cepheus-feeds-refresh-cloud-ranges
     build:
@@ -195,7 +195,7 @@ services:
         - db
     restart: "no"
     profiles: ["refresh-feeds"]
-  # ----- Ephemeral Runners ----- 
+  # ----- Ephemeral Runners -----
 
 volumes:
   tempo-data:

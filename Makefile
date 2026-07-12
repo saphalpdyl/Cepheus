@@ -1,7 +1,8 @@
-.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean test.unit
+.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean test.unit lint.editorconfig
 
 # One time setup ( builds + fills feeds )
 setup: build build-vm refresh-cloud-ip-ranges
+	./scripts/hooks/install-hooks.sh
 
 # Host Related
 build:
@@ -46,7 +47,7 @@ apply: clean build-vm
 	$(MAKE) ips
 
 
-# Tests
+# Tests and lints
 test.build:
 	docker build -t test-stamp-suite:latest -f docker/tests/stamp.test.Dockerfile .
 	docker build -t test-scamper-suite:latest -f docker/tests/scamper.test.Dockerfile .
@@ -62,6 +63,13 @@ test.integration: test.build
 	go test -v -tags integration ./libs/stamp/tests/integration
 	docker compose -f docker-compose.test.yaml exec scamper-test-suite go test -v -tags integration /app/libs/scamper-client/tests/integration
 	docker compose -f docker-compose.test.yaml down
+
+lint:
+	golangci-lint run ./...
+
+# Enforce .editorconfig across the whole repo. Config: .editorconfig-checker.json.
+lint.editorconfig:
+	docker run --rm -v $(PWD):/check -w /check mstruebing/editorconfig-checker:latest ec
 
 # Generators
 sqlc-gen:

@@ -3,7 +3,7 @@ sql:
   # Trace processor
   - engine: "postgresql"
     queries: "db/queries/processors/trace-processor/"
-    schema: 
+    schema:
       - "db/init/03-trace.sql"
       - "db/init/05-as_details.sql"
     gen:

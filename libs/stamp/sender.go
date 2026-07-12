@@ -134,7 +134,7 @@ func (s *Sender) Send() (*ReflectorPacket, error) {
 	}
 
 	// Wait for the reflected reply
-	s.Conn.SetReadDeadline(time.Now().Add(s.timeout))
+	_ = s.Conn.SetReadDeadline(time.Now().Add(s.timeout))
 	rxBuf := make([]byte, 1500)
 	n, err := s.Conn.Read(rxBuf)
 	if err != nil {
@@ -160,6 +160,6 @@ func (s *Sender) Close() error {
 	if s.Conn == nil {
 		return nil
 	}
-	s.Conn.SetReadDeadline(time.Now())
+	_ = s.Conn.SetReadDeadline(time.Now())
 	return s.Conn.Close()
 }
