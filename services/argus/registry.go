@@ -34,11 +34,11 @@ func (p *PipelineRegistry) GetExtractors(st types.SeriesType) []Extractor {
 // CreateDefaultRegistry create the default Cepheus' registry
 // Each seriesType fans out to multiple Extractor functions that again fan out to multiple detectors
 /*
- *                        ┌───────►ExtractRTTP95Ns()───────►EWMA
+ *                        ┌───────►ExtractRTTP50Ns()───────►EWMA
  *                        │
  *                        │
  *                        │                             ┌──►EWMA
- * SeriesType.STAMP───────┼───────►ExtractFwdP95Ns()────┤
+ * SeriesType.STAMP───────┼───────►ExtractFwdP50Ns()────┤
  *                        │                             └──►BOCPD
  *                        │
  *                        │
@@ -54,7 +54,7 @@ func CreateDefaultRegistry() *PipelineRegistry {
 					if !ok {
 						return nil, fmt.Errorf("expected common.StampMetrics, got %T", data)
 					}
-					return float64(m.FwdP95Ns), nil
+					return float64(m.FwdP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
@@ -65,7 +65,7 @@ func CreateDefaultRegistry() *PipelineRegistry {
 					if !ok {
 						return nil, fmt.Errorf("expected common.StampMetrics, got %T", data)
 					}
-					return float64(m.BwdP95Ns), nil
+					return float64(m.BwdP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
@@ -76,7 +76,7 @@ func CreateDefaultRegistry() *PipelineRegistry {
 					if !ok {
 						return nil, fmt.Errorf("expected common.StampMetrics, got %T", data)
 					}
-					return float64(m.RttP95Ns), nil
+					return float64(m.RttP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
@@ -103,7 +103,7 @@ func CreateDefaultRegistry() *PipelineRegistry {
 					if !ok {
 						return nil, fmt.Errorf("expected common.PingMetrics, got %T", data)
 					}
-					return float64(m.RttP95Ns), nil
+					return float64(m.RttP50Ns), nil
 				},
 				Detectors: []types.DetectorType{types.DetectorTypeEwma},
 			},
