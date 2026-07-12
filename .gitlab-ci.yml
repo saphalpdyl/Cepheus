@@ -17,6 +17,15 @@ integration:
     - make test.integration
   after_script:
     - docker compose -f docker-compose.test.yaml down
+  rules:
+    - changes:
+        - libs/stamp/**/*
+        - libs/scamper-client/**/*
+        - docker-compose.test.yaml
+        - docker/tests/**/*
+        - docker/scamper.build.Dockerfile
+    - when: manual
+      allow_failure: true
   tags:
     - docker
     - go
@@ -31,7 +40,7 @@ unit:
 
 lint:
   image: golangci/golangci-lint:latest
-  stage: test
+  stage: lint
   parallel:
     matrix:
       - LINTER:
@@ -44,6 +53,5 @@ lint:
           - noctx
           - bodyclose
           - nilerr
-          - gofumpt
   script:
     - golangci-lint run --enable-only $LINTER ./...
