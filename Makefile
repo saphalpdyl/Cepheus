@@ -1,7 +1,9 @@
-.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean test.unit lint.editorconfig
+.PHONY: build dist ips apply db dev build-vm telemetry build-runners refresh-cloud-ip-ranges setup proto-image proto-gen proto-lint proto-clean test.unit lint.editorconfig install-hooks
 
 # One time setup ( builds + fills feeds )
-setup: build build-vm refresh-cloud-ip-ranges
+setup: build build-vm refresh-cloud-ip-ranges install-hooks
+
+install-hooks:
 	./scripts/hooks/install-hooks.sh
 
 # Host Related
