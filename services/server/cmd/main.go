@@ -56,14 +56,22 @@ func main() {
 		slog.Error("failed to setup logging", "error", err)
 		os.Exit(1)
 	}
-	defer logShutdown(ctx)
+	defer func() {
+		if err := logShutdown(ctx); err != nil {
+			slog.Error("failed to shut down logging", "error", err)
+		}
+	}()
 
 	traceShutdown, err := telemetry.SetupTracing(ctx, cfg.Telemetry.Sink, cfg.Telemetry.OTelCollectorURL, "server", "", false)
 	if err != nil {
 		slog.Error("failed to setup tracing", "error", err)
 		os.Exit(1)
 	}
-	defer traceShutdown(ctx)
+	defer func() {
+		if err := traceShutdown(ctx); err != nil {
+			slog.Error("failed to shut down tracing", "error", err)
+		}
+	}()
 
 	databaseUrl, err := common.TryGetFromEnv("CEPHEUS_DB_URL")
 	if err != nil {
@@ -86,7 +94,9 @@ func main() {
 		log().Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log().Error("failed to shut down server", "error", err)
+		}
 	}()
 
 	log().Info("listening", "addr", cfg.Listen)

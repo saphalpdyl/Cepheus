@@ -108,7 +108,11 @@ func (s *ScamperClient) Start(ctx context.Context) error {
 		return err
 	}
 
-	go s.StartRead(ctx)
+	go func() {
+		if err := s.StartRead(ctx); err != nil {
+			fmt.Printf("scamper reader stopped: %v\n", err)
+		}
+	}()
 
 	// Wait for attach to be ACKed
 	select {
@@ -191,7 +195,8 @@ func (s *ScamperClient) StartRead(ctx context.Context) error {
 
 		if strings.HasPrefix(line, "OK") {
 			var id string
-			fmt.Sscanf(line, "OK %s", &id)
+			// OK lines may omit the id (e.g. attach acks); a parse miss is expected.
+			_, _ = fmt.Sscanf(line, "OK %s", &id)
 
 			s.mu.Lock()
 			if len(s.pendingQ) == 0 {
@@ -221,10 +226,16 @@ func (s *ScamperClient) StartRead(ctx context.Context) error {
 		if strings.HasPrefix(line, "DATA") {
 			var length int
 			var id string
-			fmt.Sscanf(line, "DATA %d %s", &length, &id)
+			if _, err := fmt.Sscanf(line, "DATA %d %s", &length, &id); err != nil {
+				fmt.Printf("malformed DATA line %q: %v\n", line, err)
+				continue
+			}
 
 			buf := make([]byte, length)
-			io.ReadFull(s.reader, buf)
+			if _, err := io.ReadFull(s.reader, buf); err != nil {
+				fmt.Printf("failed to read DATA payload (%d bytes): %v\n", length, err)
+				continue
+			}
 
 			if id == "" {
 				continue
