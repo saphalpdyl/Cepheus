@@ -1,8 +1,10 @@
 <img src="docs/images/logo.png" width="500">
 
 ---
+> [!IMPORTANT] PROJECT STATUS: ON HIATUS
+> Cepheus will be put on hiatus in favour of Project [Maeto](https://gitlab.com/saphalpdyl/Maeto). Cepheus' Argus will continued to be developed with the new project's trajectory in mind, whilst best efforts will be put in maintaing compatibility between both projects.
 
-> [!IMPORTANT]
+> [!NOTE] MIRROR
 > The repository on GitHub is a mirror maintained for visibility. Issue tracking and active development are done on [GitLab.](https://gitlab.com/saphalpdyl/Cepheus)
 
 Modularized route health monitoring with software-based agents for managed network systems.
